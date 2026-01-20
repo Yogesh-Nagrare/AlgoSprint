@@ -27,9 +27,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser())
 // Session middleware (required for passport) - ADD THIS BEFORE PASSPORT
 app.use(session({
+  name: "algo_sprint_session",
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
+  proxy: true,
   cookie: {
     secure: true,
     httpOnly: true,
