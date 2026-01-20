@@ -13,12 +13,12 @@ const aiRouter = require('./routes/aiChatting');
 const videoRouter = require('./routes/videoCreator')
 // Import passport configuration
 const passport = require('./config/passport');
-
+const PORT = process.env.PORT || 3000;
 // Import routes
 const googleAuthRoutes = require('./routes/googleAuth');
 
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: "https://algo-sprint-iota.vercel.app",
     credentials: true
 }))
 app.use(express.json())
@@ -53,8 +53,8 @@ const InitalizeConnection = async()=>{
         await Promise.all([main(),redisClient.connect()]);
         console.log("DB CONNECTED");
 
-        app.listen(process.env.PORT, ()=>{
-        console.log("Server listening at port number: "+ process.env.PORT);
+        app.listen(PORT, ()=>{
+        console.log(`Server listening at port number: ${PORT}`);
         console.log(`🔐 Google User Auth: http://localhost:${process.env.PORT}/auth/google/student/callback`);
         console.log(`👑 Google Admin Auth: http://localhost:${process.env.PORT}/auth/google/admin/callback`);
     })
