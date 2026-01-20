@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 3000;
 const googleAuthRoutes = require('./routes/googleAuth');
 
 app.use(cors({
-    origin: "https://algo-sprint-iota.vercel.app",
+    origin: process.env.FRONTEND_URL,
     credentials: true
 }))
 app.use(express.json())
@@ -34,7 +34,6 @@ app.use(session({
     secure: true,
     httpOnly: true,
     sameSite: "none",     // REQUIRED for cross-domain cookies
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
