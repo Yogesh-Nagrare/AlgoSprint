@@ -18,8 +18,10 @@ const PORT = process.env.PORT || 3000;
 const googleAuthRoutes = require('./routes/googleAuth');
 
 app.use(cors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true
+    origin: process.env.FRONTEND_URL || 'https://algo-sprint-iota.vercel.app',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
@@ -31,14 +33,14 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
-  proxy: true,
+  proxy: true, // Important for Vercel
   cookie: {
-    secure: true,
+    secure: process.env.NODE_ENV === 'production', // true in production
     httpOnly: true,
-    sameSite: "none",     // REQUIRED for cross-domain cookies
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
-
 // Initialize Passport - ADD THIS
 app.use(passport.initialize());
 app.use(passport.session());
