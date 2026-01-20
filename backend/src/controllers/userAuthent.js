@@ -217,7 +217,7 @@ const login = async (req,res)=>{
             profilePic: user.profilePic, // <--- YE LINE HONI CHAHIYE
         }
         const token =  jwt.sign({_id:user._id , emailId:emailId, role:user.role},process.env.JWT_KEY,{expiresIn: 60*60});
-        res.cookie('token',token,{httpOnly:true,maxAge: 60*60*1000,sameSite:'lax'});
+        res.cookie('token',token,{httpOnly:true,maxAge: 60*60*1000,sameSite:'none',secure:true});
         //frontend ko bhej rahe hai ye data json ki help se
         res.status(201).json({
             user:reply,
