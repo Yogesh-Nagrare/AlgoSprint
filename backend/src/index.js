@@ -12,37 +12,28 @@ const submitRouter = require('./routes/submit')
 const aiRouter = require('./routes/aiChatting');
 const videoRouter = require('./routes/videoCreator')
 const passport = require('./config/passport');
-const PORT = process.env.PORT || 3000;
 const googleAuthRoutes = require('./routes/googleAuth');
 
-// CORS MUST BE FIRST - Before any other middleware
-const allowedOrigins = [
-  'https://algo-sprint-iota.vercel.app',
-  'http://localhost:5173',
-  process.env.FRONTEND_URL
-].filter(Boolean);
+const PORT = process.env.PORT || 3000;
 
+// Determine environment
+const isProduction = process.env.NODE_ENV === 'production';
+const frontendUrl = isProduction 
+  ? process.env.FRONTEND_URL 
+  : process.env.CLIENT_URL;
+
+console.log('Environment:', isProduction ? 'PRODUCTION' : 'DEVELOPMENT');
+console.log('Frontend URL:', frontendUrl);
+
+// CORS configuration - works for both local and production
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Set-Cookie'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+    origin: frontendUrl,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Set-Cookie']
 }));
 
-// Handle preflight requests explicitly
-app.options('*', cors());
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
@@ -50,39 +41,45 @@ app.use(cookieParser())
 
 // Session middleware
 app.use(session({
-  name: "algo_sprint_session",
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
-  proxy: true,
+  proxy: isProduction, // Enable proxy in production (Vercel)
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProduction,
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000,
-    domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
+// Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Test route
+// Health check route
 app.get('/', (req, res) => {
   res.json({ 
     message: "Backend API is live!",
-    cors: "enabled",
+    environment: isProduction ? 'production' : 'development',
     timestamp: new Date().toISOString()
   });
 });
 
-console.log("Auth router is mounting...");
+// Routes
+console.log("Mounting routes...");
 app.use('/user', authRouter);
 app.use('/problem', problemRouter);
 app.use('/submission', submitRouter);
 app.use('/ai', aiRouter);
 app.use('/video', videoRouter);
 app.use('/auth', googleAuthRoutes);
+
+// Error handling
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ message: 'Internal server error', error: err.message });
+});
 
 let isConnected = false;
 
@@ -91,13 +88,23 @@ const InitalizeConnection = async () => {
 
   try {
     await Promise.all([main(), redisClient.connect()]);
-    console.log("DB CONNECTED");
+    console.log("✅ DB CONNECTED");
     isConnected = true;
+
+    // Only start server if not in serverless environment (Vercel)
+    if (!isProduction) {
+      app.listen(PORT, () => {
+        console.log(`🚀 Server listening at port: ${PORT}`);
+        console.log(`🔐 Google User Auth: http://localhost:${PORT}/auth/google/student/callback`);
+        console.log(`👑 Google Admin Auth: http://localhost:${PORT}/auth/google/admin/callback`);
+      });
+    }
   } catch (err) {
-    console.log("Error Occurred: " + err);
+    console.log("❌ Error Occurred: " + err);
   }
-};
+}
 
 InitalizeConnection();
 
+// Export for Vercel
 module.exports = app;
