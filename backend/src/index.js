@@ -31,8 +31,9 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
     httpOnly: true,
+    sameSite: "none",     // REQUIRED for cross-domain cookies
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
@@ -40,6 +41,11 @@ app.use(session({
 // Initialize Passport - ADD THIS
 app.use(passport.initialize());
 app.use(passport.session());
+
+app.get('/', (req, res) => {
+  res.send("Backend API is live!");
+});
+
 console.log("Auth router is mounting...");
 app.use('/user',authRouter);
 app.use('/problem',problemRouter);
@@ -48,19 +54,20 @@ app.use('/ai',aiRouter);
 app.use('/video',videoRouter);
 app.use('/auth', googleAuthRoutes);
 
-const InitalizeConnection = async()=>{
-    try {
-        await Promise.all([main(),redisClient.connect()]);
-        console.log("DB CONNECTED");
+let isConnected = false;
 
-        app.listen(PORT, ()=>{
-        console.log(`Server listening at port number: ${PORT}`);
-        console.log(`🔐 Google User Auth: http://localhost:${process.env.PORT}/auth/google/student/callback`);
-        console.log(`👑 Google Admin Auth: http://localhost:${process.env.PORT}/auth/google/admin/callback`);
-    })
-    } catch (err) {
-        console.log("Error Occurred: "+err);
-    }
-}
+const InitalizeConnection = async () => {
+  if (isConnected) return;
+
+  try {
+    await Promise.all([main(), redisClient.connect()]);
+    console.log("DB CONNECTED");
+    isConnected = true;
+  } catch (err) {
+    console.log("Error Occurred: " + err);
+  }
+};
+
 
 InitalizeConnection();
+module.exports = app;
