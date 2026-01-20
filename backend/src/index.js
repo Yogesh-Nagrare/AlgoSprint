@@ -83,24 +83,28 @@ app.use((err, req, res, next) => {
 
 let isConnected = false;
 
-// Remove the global InitalizeConnection() call at the bottom
-// Instead, use a middleware to ensure DB is connected
+const InitalizeConnection = async () => {
+  if (isConnected) return;
 
-const connectDB = async (req, res, next) => {
-    try {
-        if (!isConnected) {
-            await Promise.all([main(), redisClient.connect()]);
-            isConnected = true;
-            console.log("✅ DB & Redis Connected");
-        }
-        next();
-    } catch (error) {
-        console.error("❌ Connection Error:", error);
-        res.status(500).json({ message: "Database connection failed" });
+  try {
+    await Promise.all([main(), redisClient.connect()]);
+    console.log("✅ DB CONNECTED");
+    isConnected = true;
+
+    // Only start server if not in serverless environment (Vercel)
+    if (!isProduction) {
+      app.listen(PORT, () => {
+        console.log(`🚀 Server listening at port: ${PORT}`);
+        console.log(`🔐 Google User Auth: http://localhost:${PORT}/auth/google/student/callback`);
+        console.log(`👑 Google Admin Auth: http://localhost:${PORT}/auth/google/admin/callback`);
+      });
     }
-};
+  } catch (err) {
+    console.log("❌ Error Occurred: " + err);
+  }
+}
 
-// Use it as middleware for all routes
-app.use(connectDB);
+InitalizeConnection();
 
+// Export for Vercel
 module.exports = app;
