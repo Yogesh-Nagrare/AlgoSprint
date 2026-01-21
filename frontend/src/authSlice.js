@@ -7,7 +7,7 @@ export const registerUser = createAsyncThunk(
     try {
     // Backend ke /user/register URL pe POST request bhejo,
     // aur request ke body me userData bhejo.
-    const response =  await axiosClient.post('/user/register', userData,{ withCredentials: true });
+    const response =  await axiosClient.post('/user/register', userData);
     return response.data.user;
     } catch (error) {
       return rejectWithValue( error.response?.data || error.message);
@@ -125,7 +125,7 @@ const authSlice = createSlice({
       })
       .addCase(checkAuth.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Something went wrong';
+        // state.error = null
         state.isAuthenticated = false;
         state.user = null;
       })

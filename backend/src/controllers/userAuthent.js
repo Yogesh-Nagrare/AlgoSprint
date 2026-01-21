@@ -258,9 +258,9 @@ if (!user) {
 
   user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 min
   await user.save();
-// const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}`;
+const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}`;
 
-  const resetUrl = `https://algo-sprint-iota.vercel.app/reset-password/${resetToken}`;
+  // const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
 console.log("📧 Sending reset email to:", user.emailId);
 
 await sendEmail({
