@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const passport = require('passport');
-const googleAuthController = require('../controllers/googleAuth');
+const googleAuthController = require('../controllers/googleAuthJWT');
 
 // ============================================
 // USER GOOGLE AUTHENTICATION ROUTES

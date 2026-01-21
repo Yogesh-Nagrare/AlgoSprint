@@ -1,8 +1,7 @@
 require('dotenv').config();
 const express = require('express')
 const app = express();
-const session = require('express-session');
-const cookieParser = require('cookie-parser')
+const cookieParser = require('cookie-parser') // Keep this
 const cors = require('cors')
 const main = require('./config/db')
 const authRouter = require('./routes/userAuth')
@@ -11,12 +10,11 @@ const problemRouter = require('./routes/problemCreator')
 const submitRouter = require('./routes/submit')
 const aiRouter = require('./routes/aiChatting');
 const videoRouter = require('./routes/videoCreator')
-const passport = require('./config/passport');
+const passport = require('./config/passport'); // Updated import
 const googleAuthRoutes = require('./routes/googleAuth');
 
 const PORT = process.env.PORT || 3000;
 
-// Determine environment
 const isProduction = process.env.NODE_ENV === 'production';
 const frontendUrl = isProduction 
   ? process.env.FRONTEND_URL 
@@ -25,7 +23,6 @@ const frontendUrl = isProduction
 console.log('Environment:', isProduction ? 'PRODUCTION' : 'DEVELOPMENT');
 console.log('Frontend URL:', frontendUrl);
 
-// CORS configuration - works for both local and production
 app.use(cors({
     origin: frontendUrl,
     credentials: true,
@@ -34,32 +31,19 @@ app.use(cors({
     exposedHeaders: ['Set-Cookie']
 }));
 
-
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser())
 
 app.set('trust proxy', 1);
 
-// Session middleware
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
-  resave: false,
-  saveUninitialized: false,
-  proxy: isProduction, // Enable proxy in production (Vercel)
-  cookie: {
-    secure: isProduction,
-    httpOnly: true,
-    sameSite: isProduction ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+// ❌ REMOVE ALL SESSION MIDDLEWARE
+// ❌ REMOVE app.use(passport.session());
 
-// Initialize Passport
-app.use(passport.initialize());
-app.use(passport.session());
+// Initialize Passport (JWT-only)
+app.use(passport.initialize()); // Keep this, remove passport.session()
 
-// Health check route
+// Health check
 app.get('/', (req, res) => {
   res.json({ 
     message: "Backend API is live!",
@@ -69,7 +53,6 @@ app.get('/', (req, res) => {
 });
 
 // Routes
-console.log("Mounting routes...");
 app.use('/user', authRouter);
 app.use('/problem', problemRouter);
 app.use('/submission', submitRouter);
@@ -93,7 +76,6 @@ const InitalizeConnection = async () => {
     console.log("✅ DB CONNECTED");
     isConnected = true;
 
-    // Only start server if not in serverless environment (Vercel)
     if (!isProduction) {
       app.listen(PORT, () => {
         console.log(`🚀 Server listening at port: ${PORT}`);
@@ -108,5 +90,4 @@ const InitalizeConnection = async () => {
 
 InitalizeConnection();
 
-// Export for Vercel
 module.exports = app;
