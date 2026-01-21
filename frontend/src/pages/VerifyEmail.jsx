@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, NavLink, useParams } from "react-router"; // Use useParams
-import { CheckCircle2, XCircle, Loader2, Code, ArrowRight } from "lucide-react";
+import { useNavigate, NavLink } from "react-router";
+import { CheckCircle2, XCircle, Loader2, Code, ChevronLeft, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 function VerifyEmail() {
   const navigate = useNavigate();
-  const { token } = useParams(); // Extract token from URL params automatically
+  const token = window.location.pathname.split("/").pop();
   const hasRun = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
-
-  // Get the backend URL from environment variables
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
   useEffect(() => {
     if (hasRun.current) return;
@@ -21,15 +18,11 @@ function VerifyEmail() {
 
     const verifyEmail = async () => {
       try {
-        // Use the environment variable here
         const res = await fetch(
-          `${BACKEND_URL}/user/verify-email/${token}`,
+          `http://localhost:3000/user/verify-email/${token}`,
           {
             method: "GET",
             credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
           }
         );
 
@@ -50,13 +43,8 @@ function VerifyEmail() {
       }
     };
 
-    if (token) {
-      verifyEmail();
-    } else {
-      setError("No verification token found.");
-      setLoading(false);
-    }
-  }, [token, BACKEND_URL]);
+    verifyEmail();
+  }, [token]);
 
   return (
     <div className="min-h-screen bg-[#070707] text-gray-200 font-sans selection:bg-orange-500/30 flex flex-col items-center justify-center px-4 relative overflow-hidden">
