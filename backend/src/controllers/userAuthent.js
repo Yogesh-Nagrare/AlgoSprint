@@ -43,6 +43,8 @@ const sendEmail = require("../utils/sendEmail");
 // }
 const register = async (req, res) => {
   try {
+        console.log("REGISTER BODY:", req.body); // 👈 ADD THIS
+
     validate(req.body);
 
     const { firstName, emailId, password } = req.body;
@@ -67,7 +69,8 @@ const register = async (req, res) => {
       emailVerificationExpires: Date.now() + 1000 * 60 * 60, // 1 hour
     });
     console.log("TOKEN STORED IN DB:", verificationToken);
-    const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+    // const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
 
     await sendEmail({
       to: emailId,
@@ -156,7 +159,8 @@ const resendVerification = async (req, res) => {
     user.emailVerificationExpires = Date.now() + 1000 * 60 * 60; // 1 hour
     await user.save();
 
-    const verifyUrl = `${process.env.CLIENT_URL}/user/verify-email/${token}`;
+    const verifyUrl = `${process.env.FRONTEND_URL}/user/verify-email/${token}`;
+    // const verifyUrl = `${process.env.CLIENT_URL}/user/verify-email/${token}`;
 
     await sendEmail({
       to: emailId,
@@ -254,8 +258,9 @@ if (!user) {
 
   user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 min
   await user.save();
+const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}`;
 
-  const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+  // const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
 console.log("📧 Sending reset email to:", user.emailId);
 
 await sendEmail({
