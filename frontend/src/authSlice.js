@@ -7,7 +7,7 @@ export const registerUser = createAsyncThunk(
     try {
     // Backend ke /user/register URL pe POST request bhejo,
     // aur request ke body me userData bhejo.
-    const response =  await axiosClient.post('/user/register', userData);
+    const response =  await axiosClient.post('/user/register', userData,{ withCredentials: true });
     return response.data.user;
     } catch (error) {
       return rejectWithValue( error.response?.data || error.message);
