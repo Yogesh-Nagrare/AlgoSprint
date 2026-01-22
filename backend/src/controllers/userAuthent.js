@@ -47,13 +47,10 @@ const register = async (req, res) => {
 
     const { firstName, emailId, password } = req.body;
 
-    // Check existing user
     const existingUser = await User.findOne({ emailId });
     if (existingUser) {
       return res.status(400).json({ message: "Email already registered" });
     }
-
-    // const hashedPassword = await bcrypt.hash(password, 10);
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
 
@@ -64,16 +61,27 @@ const register = async (req, res) => {
       role: "user",
       isEmailVerified: false,
       emailVerificationToken: verificationToken,
-      emailVerificationExpires: Date.now() + 1000 * 60 * 60, // 1 hour
+      emailVerificationExpires: Date.now() + 1000 * 60 * 60,
     });
 
     console.log("✅ User created:", user._id);
 
-    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
-    // const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    const reply = {
+      firstName: user.firstName,
+      emailId: user.emailId,
+      _id: user._id,
+    };
 
-    // ✅ FIX 2: Send email asynchronously with timeout protection
-    const sendEmailPromise = sendEmail({
+    // Send response IMMEDIATELY, don't wait for email
+    res.status(201).json({
+      message: "Registration successful. Please check your email for verification.",
+      user: reply,
+    });
+
+    // Send email AFTER response (fire and forget)
+    const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    
+    sendEmail({
       to: emailId,
       subject: "Verify your email",
       html: `
@@ -83,32 +91,9 @@ const register = async (req, res) => {
         <a href="${verifyUrl}">Verify Email</a>
       `,
       text: `Verify your email: ${verifyUrl}`,
-    });
-
-    // ✅ FIX 3: Add timeout to email sending (10 seconds)
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Email timeout')), 10000)
-    );
-
-    try {
-      await Promise.race([sendEmailPromise, timeoutPromise]);
-      console.log("✅ Email sent successfully");
-    } catch (emailError) {
-      // ✅ FIX 4: Don't fail registration if email fails
+    }).catch(emailError => {
       console.error("⚠️ Email sending failed:", emailError.message);
-      // User is still created, they can resend verification later
-    }
-
-    const reply = {
-      firstName: user.firstName,
-      emailId: user.emailId,
-      _id: user._id,
-    };
-
-    // ✅ Always return success if user is created
-    return res.status(201).json({
-      message: "Registration successful. Please check your email for verification.",
-      user: reply,
+      // Optionally: Store failed email attempts in DB for retry later
     });
 
   } catch (err) {
@@ -118,7 +103,6 @@ const register = async (req, res) => {
     });
   }
 };
-
 const verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;

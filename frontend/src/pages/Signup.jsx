@@ -35,17 +35,18 @@ function Signup() {
       navigate("/");
     }
   }, [isAuthenticated, navigate]);
-
 const onSubmit = (data) => {
   dispatch(registerUser(data))
     .unwrap()
-    .then(() => {
+    .then((response) => {
+      // Show success message
+      alert("Registration successful! Please check your email to verify your account.");
       navigate("/verify-notice");
     })
     .catch((err) => {
       console.error("Registration error:", err);
       const errorMsg = err?.message || err || "Registration failed";
-      alert(errorMsg); // Replace with toast notification
+      alert(errorMsg);
     }); 
 };
 

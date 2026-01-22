@@ -1,25 +1,46 @@
 const nodemailer = require("nodemailer");
 
 const sendEmail = async ({ to, subject, html, text }) => {
-  const transporter = nodemailer.createTransport({
-    host: process.env.HOST,
-    port: Number(process.env.EMAIL_PORT),
-    secure: process.env.SECURE === "true", // false for 587
-    auth: {
+  try {
+    console.log("📧 Starting email send to:", to);
+    console.log("📧 SMTP Config:", {
+      host: process.env.HOST,
+      port: process.env.EMAIL_PORT,
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+      hasPassword: !!process.env.EMAIL_PASS
+    });
 
-  await transporter.verify(); // 🔥 THIS LINE CONFIRMS SMTP
-  
-  await transporter.sendMail({
-    from: `"My App" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    html,
-    text,
-  });
+    const transporter = nodemailer.createTransport({
+      host: process.env.HOST,
+      port: Number(process.env.EMAIL_PORT),
+      secure: process.env.SECURE === "true",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+      // Add these for better debugging
+      logger: true,
+      debug: true,
+    });
+
+    console.log("📧 Verifying SMTP connection...");
+    await transporter.verify();
+    console.log("✅ SMTP connection verified");
+    
+    const info = await transporter.sendMail({
+      from: `"AlgoSprint" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+      text,
+    });
+
+    console.log("✅ Email sent successfully:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("❌ Email sending failed:", error);
+    throw error;
+  }
 };
 
 module.exports = sendEmail;
