@@ -36,16 +36,18 @@ function Signup() {
     }
   }, [isAuthenticated, navigate]);
 
-  const onSubmit = (data) => {
-    dispatch(registerUser(data)).unwrap()
-      .then(() => {
-        navigate("/verify-notice");
-      })
-      .catch((err) => {
-        console.error(err);
-    alert(err); // or toast.error(err)
-      }); 
-  };
+const onSubmit = (data) => {
+  dispatch(registerUser(data))
+    .unwrap()
+    .then(() => {
+      navigate("/verify-notice");
+    })
+    .catch((err) => {
+      console.error("Registration error:", err);
+      const errorMsg = err?.message || err || "Registration failed";
+      alert(errorMsg); // Replace with toast notification
+    }); 
+};
 
   return (
     <div className="min-h-screen bg-[#070707] text-gray-200 font-sans selection:bg-orange-500/30 flex flex-col items-center justify-center px-4 relative overflow-hidden">

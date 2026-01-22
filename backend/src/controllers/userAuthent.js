@@ -50,7 +50,7 @@ const register = async (req, res) => {
     // Check existing user
     const existingUser = await User.findOne({ emailId });
     if (existingUser) {
-      return res.status(400).send("Email already registered");
+      return res.status(400).json({ message: "Email already registered" });
     }
 
     // const hashedPassword = await bcrypt.hash(password, 10);
@@ -66,11 +66,14 @@ const register = async (req, res) => {
       emailVerificationToken: verificationToken,
       emailVerificationExpires: Date.now() + 1000 * 60 * 60, // 1 hour
     });
-    console.log("TOKEN STORED IN DB:", verificationToken);
-    // const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
-    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
 
-    await sendEmail({
+    console.log("✅ User created:", user._id);
+
+    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+    // const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+
+    // ✅ FIX 2: Send email asynchronously with timeout protection
+    const sendEmailPromise = sendEmail({
       to: emailId,
       subject: "Verify your email",
       html: `
@@ -82,18 +85,37 @@ const register = async (req, res) => {
       text: `Verify your email: ${verifyUrl}`,
     });
 
+    // ✅ FIX 3: Add timeout to email sending (10 seconds)
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Email timeout')), 10000)
+    );
+
+    try {
+      await Promise.race([sendEmailPromise, timeoutPromise]);
+      console.log("✅ Email sent successfully");
+    } catch (emailError) {
+      // ✅ FIX 4: Don't fail registration if email fails
+      console.error("⚠️ Email sending failed:", emailError.message);
+      // User is still created, they can resend verification later
+    }
+
     const reply = {
       firstName: user.firstName,
       emailId: user.emailId,
       _id: user._id,
     };
 
-    res.status(201).json({
-      message: "Registration successful. Please verify your email.",
-      user:reply,
+    // ✅ Always return success if user is created
+    return res.status(201).json({
+      message: "Registration successful. Please check your email for verification.",
+      user: reply,
     });
+
   } catch (err) {
-    res.status(400).send("Error: " + err.message);
+    console.error("❌ Registration error:", err);
+    return res.status(400).json({ 
+      message: err.message || "Registration failed" 
+    });
   }
 };
 
