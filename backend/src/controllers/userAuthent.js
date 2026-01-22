@@ -79,7 +79,8 @@ const register = async (req, res) => {
     });
 
     // Send email AFTER response (fire and forget)
-    const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    // const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
     
     sendEmail({
       to: emailId,
