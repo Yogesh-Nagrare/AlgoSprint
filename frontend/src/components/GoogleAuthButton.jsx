@@ -3,7 +3,7 @@ import { FcGoogle } from 'react-icons/fc';
 function GoogleAuthButton({ type = 'user', isLoading = false }) {
   const handleGoogleAuth = () => {
     // Replace with your backend URL from .env
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
     const endpoint = type === 'admin' 
       ? `${baseUrl}/auth/google/admin`
       : `${baseUrl}/auth/google/user`;
