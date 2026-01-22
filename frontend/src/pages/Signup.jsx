@@ -41,7 +41,10 @@ function Signup() {
       .then(() => {
         navigate("/verify-notice");
       })
-      .catch(() => {}); 
+      .catch((err) => {
+        console.error(err);
+    alert(err); // or toast.error(err)
+      }); 
   };
 
   return (

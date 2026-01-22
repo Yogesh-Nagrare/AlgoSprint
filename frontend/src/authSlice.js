@@ -92,6 +92,7 @@ const authSlice = createSlice({
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         // state.error = action.payload?.message || 'Something went wrong';
+        state.error = action.payload?.message || action.payload || "Registration failed";
         state.isAuthenticated = false;
         state.user = null;
       })
