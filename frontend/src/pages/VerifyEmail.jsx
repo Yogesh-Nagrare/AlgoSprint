@@ -19,7 +19,7 @@ function VerifyEmail() {
     const verifyEmail = async () => {
       try {
         const res = await fetch(
-          `http://localhost:3000/user/verify-email/${token}`,
+        `${import.meta.env.VITE_BACKEND_URL}/user/verify-email/${token}`,
           {
             method: "GET",
             credentials: "include",
