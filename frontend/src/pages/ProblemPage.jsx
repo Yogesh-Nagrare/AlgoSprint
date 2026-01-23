@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react'; // Added useCallback
 import { useForm } from 'react-hook-form';
 import Editor from '@monaco-editor/react';
 import { useParams, NavLink } from 'react-router'; 
@@ -20,9 +20,10 @@ import {
     Terminal,
     CheckCircle2,
     XCircle,
-    RotateCcw, // Added Reset Icon
+    RotateCcw,
     Info,
-    Copy, // Add this
+    Copy,
+    Settings as SettingsIcon, // Renamed for clarity vs component
 } from 'lucide-react';
 
 const langMap = {
@@ -34,11 +35,45 @@ const langMap = {
 const ProblemPage = () => {
     const dispatch = useDispatch();
     const { problemId } = useParams();
-    const [copiedId, setCopiedId] = useState(null); // To track which solution was copied
+    const [copiedId, setCopiedId] = useState(null);
     const editorState = useSelector((state) => state.editor) || {};
     const userCode = editorState.userCode || {};
     const lastSelectedLanguage = editorState.lastSelectedLanguage || {};
     
+    // --- RESIZING LOGIC START ---
+    const [leftWidth, setLeftWidth] = useState(50); // percentage
+    const isResizing = useRef(false);
+
+    const startResizing = useCallback(() => {
+        isResizing.current = true;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    }, []);
+
+    const stopResizing = useCallback(() => {
+        isResizing.current = false;
+        document.body.style.cursor = 'default';
+        document.body.style.userSelect = 'auto';
+    }, []);
+
+    const resize = useCallback((e) => {
+        if (!isResizing.current) return;
+        const newWidth = (e.clientX / window.innerWidth) * 100;
+        if (newWidth > 20 && newWidth < 80) { // Constraints
+            setLeftWidth(newWidth);
+        }
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('mousemove', resize);
+        window.addEventListener('mouseup', stopResizing);
+        return () => {
+            window.removeEventListener('mousemove', resize);
+            window.removeEventListener('mouseup', stopResizing);
+        };
+    }, [resize, stopResizing]);
+    // --- RESIZING LOGIC END ---
+
     const [selectedTestCaseIndex, setSelectedTestCaseIndex] = useState(0);
     const [problem, setProblem] = useState(null);
     const [selectedLanguage, setSelectedLanguage] = useState(
@@ -52,7 +87,7 @@ const ProblemPage = () => {
     const [activeLeftTab, setActiveLeftTab] = useState('description');
     const [activeRightTab, setActiveRightTab] = useState('code');
     const editorRef = useRef(null);
-    // Add this near your other states
+
     const [settings, setSettings] = useState(() => {
         const saved = localStorage.getItem('editor_settings');
         return saved ? JSON.parse(saved) : {
@@ -64,10 +99,10 @@ const ProblemPage = () => {
         };
     });
 
-    // Update localStorage when settings change
     useEffect(() => {
         localStorage.setItem('editor_settings', JSON.stringify(settings));
     }, [settings]);
+    
     const { handleSubmit } = useForm();
 
     useEffect(() => {
@@ -99,21 +134,14 @@ const ProblemPage = () => {
         }
     }, [selectedLanguage, problem, problemId]); 
 
-    // --- LOGIC FOR RESET CODE ---
     const handleResetCode = () => {
         if (!problem) return;
-        
-        // 1. Find the original starter code from the problem object
         const defaultInitial = problem.startCode.find(
             (sc) => sc.language === langMap[selectedLanguage]
         )?.initialCode || '';
-        
-        // 2. Programmatically update the editor UI
         if (editorRef.current) {
             editorRef.current.setValue(defaultInitial);
         }
-        
-        // 3. Update local state and Redux persistence
         setCode(defaultInitial);
         dispatch(updateCode({ problemId, language: selectedLanguage, code: defaultInitial }));
     };
@@ -160,15 +188,17 @@ const ProblemPage = () => {
             setActiveRightTab('result');
         }
     };
-const handleCopy = async (text, id) => {
-    try {
-        await navigator.clipboard.writeText(text);
-        setCopiedId(id); // Set the specific ID as copied
-        setTimeout(() => setCopiedId(null), 2000); // Reset after 2 seconds
-    } catch (err) {
-        console.error('Failed to copy!', err);
-    }
-};
+
+    const handleCopy = async (text, id) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        } catch (err) {
+            console.error('Failed to copy!', err);
+        }
+    };
+
     const getDifficultyColor = (difficulty) => {
         switch (difficulty?.toLowerCase()) {
             case 'easy': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
@@ -189,7 +219,7 @@ const handleCopy = async (text, id) => {
 
     return (
         <div className="h-screen flex flex-col bg-[#0f0f0f] text-gray-200 overflow-hidden font-sans">
-            <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#1a1a1a] shadow-xl z-20">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#1a1a1a] shadow-xl z-20 shrink-0">
                 <div className="flex items-center gap-3">
                     <NavLink to="/" className="flex items-center gap-2 text-gray-400 hover:text-white transition-all group">
                         <div className="p-1.5 rounded-md group-hover:bg-white/10">
@@ -208,9 +238,14 @@ const handleCopy = async (text, id) => {
                 </div>
             </div>
 
-            <div className="flex-1 flex gap-3 p-3 overflow-hidden">
-                <div className="w-1/2 flex flex-col bg-[#1e1e1e] rounded-xl border border-white/10 overflow-hidden shadow-2xl">
-                    <div className="flex items-center bg-[#252525] border-b border-white/5 px-2">
+            <div className="flex-1 flex p-3 overflow-hidden gap-0">
+                {/* LEFT PANEL */}
+                <div 
+                    style={{ width: `${leftWidth}%` }}
+                    className="flex flex-col bg-[#1e1e1e] rounded-xl border border-white/10 overflow-hidden shadow-2xl min-w-[150px]"
+                >
+                    {/* HORIZONTALLY SCROLLABLE TABS CONTAINER */}
+                    <div className="flex items-center bg-[#252525] border-b border-white/5 px-2 overflow-x-auto whitespace-nowrap custom-scrollbar shrink-0">
                         {[
                             { id: 'description', label: 'Description', icon: <FileText size={14}/> },
                             { id: 'editorial', label: 'Editorial', icon: <Lightbulb size={14}/> },
@@ -221,7 +256,7 @@ const handleCopy = async (text, id) => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveLeftTab(tab.id)}
-                                className={`flex items-center gap-2 px-5 py-3 text-[13px] font-medium transition-all relative ${
+                                className={`flex items-center gap-2 px-5 py-3 text-[13px] font-medium transition-all relative shrink-0 ${
                                     activeLeftTab === tab.id ? 'text-orange-500 bg-white/5' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                                 }`}
                             >
@@ -264,7 +299,6 @@ const handleCopy = async (text, id) => {
                                                         <div className="flex gap-4"><span className="text-orange-500/70 w-16 shrink-0">Input:</span> <span className="text-gray-200">{example.input}</span></div>
                                                         <div className="flex gap-4"><span className="text-emerald-500/70 w-16 shrink-0">Output:</span> <span className="text-gray-200">{example.output}</span></div>
                                                         <div className="flex gap-4"><span className="text-emerald-500/70 w-16 shrink-0">Expanation:</span> <span className="text-gray-200">{example.explanation}</span></div>
-
                                                     </div>
                                                 </div>
                                             ))}
@@ -290,10 +324,7 @@ const handleCopy = async (text, id) => {
                                                     }`}
                                                 >
                                                     {copiedId === i ? (
-                                                        <>
-                                                            <CheckCircle2 size={12} />
-                                                            Copied!
-                                                        </>
+                                                        <><CheckCircle2 size={12} /> Copied!</>
                                                     ) : (
                                                         'Copy'
                                                     )}
@@ -311,9 +342,20 @@ const handleCopy = async (text, id) => {
                     </div>
                 </div>
 
+                {/* --- RESIZE DIVIDER --- */}
+                <div 
+                    onMouseDown={startResizing}
+                    className="w-1.5 h-full cursor-col-resize hover:bg-orange-500/30 transition-colors flex items-center justify-center group shrink-0"
+                >
+                    <div className="w-[1px] h-10 bg-white/10 group-hover:bg-orange-500 group-active:h-full transition-all" />
+                </div>
+
                 {/* RIGHT PANEL (EDITOR) */}
-                <div className="w-1/2 flex flex-col bg-[#1e1e1e] rounded-xl border border-white/10 overflow-hidden shadow-2xl">
-                    <div className="flex items-center justify-between bg-[#252525] border-b border-white/5 px-4 h-12">
+                <div 
+                    style={{ width: `${100 - leftWidth}%` }}
+                    className="flex flex-col bg-[#1e1e1e] rounded-xl border border-white/10 overflow-hidden shadow-2xl min-w-[150px]"
+                >
+                    <div className="flex items-center justify-between bg-[#252525] border-b border-white/5 px-4 h-12 shrink-0">
                         <div className="flex items-center gap-2">
                             <div className="dropdown relative group">
                                 <label tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 text-gray-300 cursor-pointer transition-colors text-xs font-semibold">
@@ -336,21 +378,11 @@ const handleCopy = async (text, id) => {
                             </div>
                         </div>
                         <div className="flex items-center gap-1">
-                             {/* RESET BUTTON ADDED HERE */}
-                             <button 
-                                onClick={handleResetCode} 
-                                className="p-1.5 text-gray-500 hover:text-white transition-colors flex items-center gap-1 group"
-                                title="Reset to default code"
-                             >
+                             <button onClick={handleResetCode} className="p-1.5 text-gray-500 hover:text-white transition-colors flex items-center gap-1 group" title="Reset to default code">
                                 <RotateCcw size={14} className="group-hover:rotate-[-45deg] transition-transform"/>
                                 <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Reset</span>
                              </button>
-                                {/* COPY CODE BUTTON */}
-                            <button 
-                                onClick={() => handleCopy(code, 'main-editor')} 
-                                className="p-1.5 text-gray-500 hover:text-white transition-colors flex items-center gap-1 group"
-                                title="Copy current code"
-                            >
+                            <button onClick={() => handleCopy(code, 'main-editor')} className="p-1.5 text-gray-500 hover:text-white transition-colors flex items-center gap-1 group" title="Copy current code">
                                 {copiedId === 'main-editor' ? (
                                     <CheckCircle2 size={14} className="text-emerald-400 animate-in zoom-in" />
                                 ) : (
@@ -361,85 +393,52 @@ const handleCopy = async (text, id) => {
                                 </span>
                             </button>
                             <div className="dropdown dropdown-end relative group">
-                        <label tabIndex={0} className="p-1.5 text-gray-500 hover:text-white transition-colors cursor-pointer flex items-center">
-                            <Settings size={14} />
-                        </label>
-                        
-                        <div tabIndex={0} className="dropdown-content absolute right-0 top-full mt-2 z-[110] p-4 shadow-2xl bg-[#2a2a2a] border border-white/10 rounded-xl w-64 backdrop-blur-xl">
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Editor Settings</h3>
-                            
-                            <div className="space-y-4">
-                                {/* Font Size */}
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs text-gray-300">Font Size</span>
-                                    <select 
-                                        value={settings.fontSize}
-                                        onChange={(e) => setSettings({...settings, fontSize: Number(e.target.value)})}
-                                        className="bg-[#1e1e1e] text-[11px] px-2 py-1 rounded border border-white/10 outline-none"
-                                    >
-                                        {[12, 14, 16, 18, 20].map(size => (
-                                            <option key={size} value={size}>{size}px</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Tab Size */}
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs text-gray-300">Tab Size</span>
-                                    <div className="flex gap-1">
-                                        {[2, 4].map(size => (
-                                            <button 
-                                                key={size}
-                                                onClick={() => setSettings({...settings, tabSize: size})}
-                                                className={`px-2 py-1 text-[10px] rounded ${settings.tabSize === size ? 'bg-orange-500 text-white' : 'bg-white/5 text-gray-400'}`}
-                                            >
-                                                {size}
+                                <label tabIndex={0} className="p-1.5 text-gray-500 hover:text-white transition-colors cursor-pointer flex items-center">
+                                    <SettingsIcon size={14} />
+                                </label>
+                                <div tabIndex={0} className="dropdown-content absolute right-0 top-full mt-2 z-[110] p-4 shadow-2xl bg-[#2a2a2a] border border-white/10 rounded-xl w-64 backdrop-blur-xl">
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Editor Settings</h3>
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-gray-300">Font Size</span>
+                                            <select value={settings.fontSize} onChange={(e) => setSettings({...settings, fontSize: Number(e.target.value)})} className="bg-[#1e1e1e] text-[11px] px-2 py-1 rounded border border-white/10 outline-none">
+                                                {[12, 14, 16, 18, 20].map(size => <option key={size} value={size}>{size}px</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-gray-300">Tab Size</span>
+                                            <div className="flex gap-1">
+                                                {[2, 4].map(size => (
+                                                    <button key={size} onClick={() => setSettings({...settings, tabSize: size})} className={`px-2 py-1 text-[10px] rounded ${settings.tabSize === size ? 'bg-orange-500 text-white' : 'bg-white/5 text-gray-400'}`}>
+                                                        {size}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-gray-300">Word Wrap</span>
+                                            <button onClick={() => setSettings({...settings, wordWrap: settings.wordWrap === 'on' ? 'off' : 'on'})} className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${settings.wordWrap === 'on' ? 'text-orange-500 bg-orange-500/10' : 'text-gray-500 bg-white/5'}`}>
+                                                {settings.wordWrap === 'on' ? 'Enabled' : 'Disabled'}
                                             </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Word Wrap Toggle */}
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-gray-300">Word Wrap</span>
-                                        <button 
-                                            onClick={() => setSettings({...settings, wordWrap: settings.wordWrap === 'on' ? 'off' : 'on'})}
-                                            className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${settings.wordWrap === 'on' ? 'text-orange-500 bg-orange-500/10' : 'text-gray-500 bg-white/5'}`}
-                                        >
-                                            {settings.wordWrap === 'on' ? 'Enabled' : 'Disabled'}
-                                        </button>
-                                    </div>
-
-                                    {/* Minimap Toggle */}
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-gray-300">Minimap</span>
-                                        <input 
-                                            type="checkbox" 
-                                            checked={settings.minimap}
-                                            onChange={(e) => setSettings({...settings, minimap: e.target.checked})}
-                                            className="checkbox checkbox-xs checkbox-warning border-white/20"
-                                        />
-                                    </div>
-                                    
-                                    {/* Theme Toggle */}
-                                    <div className="pt-2 border-t border-white/5">
-                                        <span className="text-[10px] text-gray-500 font-bold uppercase block mb-2">Theme</span>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {['vs-dark', 'light'].map(t => (
-                                                <button
-                                                    key={t}
-                                                    onClick={() => setSettings({...settings, theme: t})}
-                                                    className={`py-1.5 rounded text-[10px] border ${settings.theme === t ? 'border-orange-500 text-orange-500' : 'border-white/5 text-gray-400'}`}
-                                                >
-                                                    {t === 'vs-dark' ? 'Dark' : 'Light'}
-                                                </button>
-                                            ))}
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-gray-300">Minimap</span>
+                                            <input type="checkbox" checked={settings.minimap} onChange={(e) => setSettings({...settings, minimap: e.target.checked})} className="checkbox checkbox-xs checkbox-warning border-white/20"/>
+                                        </div>
+                                        <div className="pt-2 border-t border-white/5">
+                                            <span className="text-[10px] text-gray-500 font-bold uppercase block mb-2">Theme</span>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {['vs-dark', 'light'].map(t => (
+                                                    <button key={t} onClick={() => setSettings({...settings, theme: t})} className={`py-1.5 rounded text-[10px] border ${settings.theme === t ? 'border-orange-500 text-orange-500' : 'border-white/5 text-gray-400'}`}>
+                                                        {t === 'vs-dark' ? 'Dark' : 'Light'}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
                             </div>                        
-                            </div>
+                        </div>
                     </div>
 
                     <div className="flex-1 relative flex flex-col overflow-hidden bg-[#1e1e1e]">
@@ -451,17 +450,18 @@ const handleCopy = async (text, id) => {
                             defaultValue={code}
                             onChange={handleEditorChange}
                             onMount={handleEditorDidMount}
-                            theme={settings.theme} // Dynamic Theme
+                            theme={settings.theme}
                             options={{ 
-                                fontSize: settings.fontSize, // Dynamic Font Size
-                                minimap: { enabled: settings.minimap }, // Dynamic Minimap
-                                tabSize: settings.tabSize, // Dynamic Tab Size
-                                wordWrap: settings.wordWrap, // Dynamic Wrap
+                                fontSize: settings.fontSize,
+                                minimap: { enabled: settings.minimap },
+                                tabSize: settings.tabSize,
+                                wordWrap: settings.wordWrap,
                                 padding: { top: 20 },
                                 lineNumbersMinChars: 3,
                                 smoothScrolling: true,
                                 cursorSmoothCaretAnimation: "on",
-                                fontFamily: "'Fira Code', monospace"
+                                fontFamily: "'Fira Code', monospace",
+                                automaticLayout: true,
                             }}
                         />
                         ) : (
@@ -473,10 +473,7 @@ const handleCopy = async (text, id) => {
                                             {activeRightTab === 'testcase' ? 'Execution Results' : 'Submission Summary'}
                                         </h3>
                                     </div>
-                                    <button 
-                                        onClick={() => setActiveRightTab('code')} 
-                                        className="text-[11px] font-bold uppercase tracking-widest text-gray-500 hover:text-white bg-white/5 px-3 py-1.5 rounded-md transition-all"
-                                    >
+                                    <button onClick={() => setActiveRightTab('code')} className="text-[11px] font-bold uppercase tracking-widest text-gray-500 hover:text-white bg-white/5 px-3 py-1.5 rounded-md transition-all">
                                         Close Console
                                     </button>
                                 </div>
@@ -487,7 +484,6 @@ const handleCopy = async (text, id) => {
                                             {runResult.success ? <CheckCircle2 size={20}/> : <XCircle size={20}/>}
                                             {runResult.success ? 'Accepted' : 'Runtime Error'}
                                         </div>
-
                                         <div className="flex gap-3 mb-6 overflow-x-auto pb-2 custom-scrollbar">
                                             {runResult.testCases?.map((tc, index) => (
                                                 <button
@@ -504,7 +500,6 @@ const handleCopy = async (text, id) => {
                                                 </button>
                                             ))}
                                         </div>
-
                                         {runResult.testCases?.[selectedTestCaseIndex] && (
                                             <div className="grid gap-4 animate-in fade-in zoom-in-95 duration-300">
                                                 {[
@@ -557,28 +552,17 @@ const handleCopy = async (text, id) => {
                         )}
                     </div>
 
-                    <div className="h-16 bg-[#252525] border-t border-white/5 flex items-center justify-between px-6">
-                        <button 
-                            onClick={() => setActiveLeftTab('chatAI')} 
-                            className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg transition-all group"
-                        >
+                    <div className="h-16 bg-[#252525] border-t border-white/5 flex items-center justify-between px-6 shrink-0">
+                        <button onClick={() => setActiveLeftTab('chatAI')} className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg transition-all group">
                             <MessageSquare size={16} className="text-orange-500 group-hover:scale-110 transition-transform" />
                             AI Tutor
                         </button>
                         <div className="flex gap-3">
-                            <button 
-                                onClick={handleRun} 
-                                disabled={loading} 
-                                className="flex items-center gap-2 px-6 py-2 bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white text-sm font-semibold rounded-lg transition-all disabled:opacity-50 active:scale-95"
-                            >
+                            <button onClick={handleRun} disabled={loading} className="flex items-center gap-2 px-6 py-2 bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white text-sm font-semibold rounded-lg transition-all disabled:opacity-50 active:scale-95">
                                 <Play size={14} fill="currentColor" />
                                 {loading ? 'Running...' : 'Run'}
                             </button>
-                            <button 
-                                onClick={handleSubmitCode} 
-                                disabled={loading} 
-                                className="flex items-center gap-2 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(249,115,22,0.3)] disabled:opacity-50 active:scale-95"
-                            >
+                            <button onClick={handleSubmitCode} disabled={loading} className="flex items-center gap-2 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(249,115,22,0.3)] disabled:opacity-50 active:scale-95">
                                 <Send size={14} />
                                 {loading ? 'Submitting...' : 'Submit'}
                             </button>
@@ -594,6 +578,10 @@ const handleCopy = async (text, id) => {
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #444; }
                 .dropdown-content { visibility: hidden; opacity: 0; transform: translateY(-10px); transition: all 0.2s; }
                 .dropdown:focus-within .dropdown-content { visibility: visible; opacity: 1; transform: translateY(0); }
+                /* Hide scrollbar for Chrome, Safari and Opera */
+                .whitespace-nowrap::-webkit-scrollbar { display: none; }
+                /* Hide scrollbar for IE, Edge and Firefox */
+                .whitespace-nowrap { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
         </div>
     );
