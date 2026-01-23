@@ -86,17 +86,85 @@ const register = async (req, res) => {
       to: emailId,
       subject: "Verify your email",
       html: `
-        <h2>Email Verification</h2>
-        <p>Hello ${firstName},</p>
-        <p>Click below to verify your email:</p>
-        <a href="${verifyUrl}">Verify Email</a>
+       <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="padding: 40px 30px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">AlgoSprint</h1>
+                      <p style="margin: 10px 0 0 0; color: #fff; font-size: 14px;">Verify Your Email Address</p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px 30px;">
+                      <h2 style="margin: 0 0 20px 0; color: #333333; font-size: 22px;">Hello ${firstName}! 👋</h2>
+                      <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                        Thank you for signing up for AlgoSprint! We're excited to have you on board.
+                      </p>
+                      <p style="margin: 0 0 30px 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                        To complete your registration and start solving algorithms, please verify your email address by clicking the button below:
+                      </p>
+                      
+                      <!-- Button -->
+                      <table role="presentation" style="margin: 0 auto;">
+                        <tr>
+                          <td style="border-radius: 8px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);">
+                            <a href="${verifyUrl}" style="display: inline-block; padding: 16px 40px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">
+                              Verify Email Address
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="margin: 30px 0 0 0; color: #999999; font-size: 14px; line-height: 1.6;">
+                        If the button doesn't work, copy and paste this link into your browser:
+                      </p>
+                      <p style="margin: 10px 0 0 0; color: #f97316; font-size: 14px; word-break: break-all;">
+                        ${verifyUrl}
+                      </p>
+                      
+                      <p style="margin: 30px 0 0 0; color: #999999; font-size: 14px; line-height: 1.6;">
+                        This verification link will expire in 1 hour.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="padding: 30px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+                      <p style="margin: 0 0 10px 0; color: #999999; font-size: 12px; text-align: center;">
+                        This email was sent from AlgoSprint because you created an account.
+                      </p>
+                      <p style="margin: 0; color: #999999; font-size: 12px; text-align: center;">
+                        If you didn't create this account, please ignore this email.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
       `,
-      text: `Verify your email: ${verifyUrl}`,
+      text: `Hello ${firstName}!\n\nThank you for signing up for AlgoSprint. Please verify your email by clicking this link:\n\n${verifyUrl}\n\nThis link will expire in 1 hour.\n\nIf you didn't create this account, please ignore this email.\n\nBest regards,\nThe AlgoSprint Team`,
     }).catch(emailError => {
       console.error("⚠️ Email sending failed:", emailError.message);
       // Optionally: Store failed email attempts in DB for retry later
     });
-
   } catch (err) {
     console.error("❌ Registration error:", err);
     return res.status(400).json({ 
@@ -104,20 +172,16 @@ const register = async (req, res) => {
     });
   }
 };
-const verifyEmail = async (req, res) => {
+const  verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;
-    const hashedToken = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
 
     const user = await User.findOne({
       emailVerificationToken: token,
       emailVerificationExpires: { $gt: Date.now() },
     });
-    console.log("TOKEN FROM URL:", token);
 
+    console.log("TOKEN FROM URL:", token);
 
     if (!user) {
       return res.status(400).json({
@@ -130,7 +194,6 @@ const verifyEmail = async (req, res) => {
     user.emailVerificationExpires = null;
 
     await user.save();
-
     return res.status(200).json({
       message: "Email verified successfully. You can now login.",
     });
@@ -143,17 +206,13 @@ const verifyEmail = async (req, res) => {
 const resendVerification = async (req, res) => {
   try {
     const { emailId } = req.body;
-
     if (!emailId) {
       return res.status(400).json({ message: "Email is required" });
     }
-
     const user = await User.findOne({ emailId });
-
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
     if (user.isEmailVerified) {
       return res.status(400).json({ message: "Email already verified" });
     }
@@ -241,86 +300,188 @@ const login = async (req,res)=>{
 //forget password
 
 
-const forgotPassword = async (req, res) => {
-  const { emailId } = req.body;
+ const forgotPassword = async (req, res) => {
+  try {
+    const { emailId } = req.body;
 
-  const user = await User.findOne({ emailId });
-if (!user) {
-  console.log("❌ No user found for email:", emailId);
-  return res.json({
-    message: "If the email exists, a reset link has been sent",
-  });
-}
+    console.log("📧 Forgot password request for:", emailId);
 
-  // Generate token
-  const resetToken = crypto.randomBytes(32).toString("hex");
+    if (!emailId) {
+      return res.status(400).json({ message: "Email is required" });
+    }
 
-  // Hash token before saving
-  user.resetPasswordToken = crypto
-    .createHash("sha256")
-    .update(resetToken)
-    .digest("hex");
+    const user = await User.findOne({ emailId });
 
-  user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 min
-  await user.save();
+    if (!user) {
+      console.log("❌ No user found for email:", emailId);
+      // Don't reveal if user exists or not (security)
+      return res.json({
+        message: "If the email exists, a reset link has been sent",
+      });
+    }
 
-  const resetUrl = `https://algo-sprint-iota.vercel.app/reset-password/${resetToken}`;
-console.log("📧 Sending reset email to:", user.emailId);
+    // ✅ Generate PLAIN token (no hashing)
+    const resetToken = crypto.randomBytes(32).toString("hex");
 
-await sendEmail({
-  to: user.emailId,
-  subject: "Reset your password",
-  text: `Click to reset password: ${resetUrl}`,
-  // html optional
-});
+    // ✅ Save PLAIN token (consistent with email verification)
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 min
+    await user.save();
 
+    console.log("✅ Reset token saved for user:", user._id);
 
-  res.json({ message: "Reset link sent to email" });
+    // ✅ Use FRONTEND_URL for production
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+    // const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+
+    console.log("📧 Sending reset email to:", user.emailId);
+    console.log("🔗 Reset URL:", resetUrl);
+
+    // Send email asynchronously
+    sendEmail({
+      to: user.emailId,
+      subject: "Reset your AlgoSprint password",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  
+                  <tr>
+                    <td style="padding: 40px 30px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">AlgoSprint</h1>
+                      <p style="margin: 10px 0 0 0; color: #fff; font-size: 14px;">Password Reset Request</p>
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td style="padding: 40px 30px;">
+                      <h2 style="margin: 0 0 20px 0; color: #333333; font-size: 22px;">Hi ${user.firstName},</h2>
+                      <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                        We received a request to reset your password for your AlgoSprint account.
+                      </p>
+                      <p style="margin: 0 0 30px 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                        Click the button below to choose a new password:
+                      </p>
+                      
+                      <table role="presentation" style="margin: 0 auto;">
+                        <tr>
+                          <td style="border-radius: 8px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);">
+                            <a href="${resetUrl}" style="display: inline-block; padding: 16px 40px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">
+                              Reset Password
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="margin: 30px 0 0 0; color: #999999; font-size: 14px; line-height: 1.6;">
+                        If the button doesn't work, copy and paste this link into your browser:
+                      </p>
+                      <p style="margin: 10px 0 0 0; color: #f97316; font-size: 14px; word-break: break-all;">
+                        ${resetUrl}
+                      </p>
+                      
+                      <p style="margin: 30px 0 0 0; color: #999999; font-size: 14px; line-height: 1.6;">
+                        This link will expire in 15 minutes.
+                      </p>
+                      <p style="margin: 10px 0 0 0; color: #999999; font-size: 14px; line-height: 1.6;">
+                        If you didn't request this, you can safely ignore this email.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                  <tr>
+                    <td style="padding: 30px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+                      <p style="margin: 0; color: #999999; font-size: 12px; text-align: center;">
+                        — The AlgoSprint Team
+                      </p>
+                    </td>
+                  </tr>
+                  
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+      text: `Hi ${user.firstName},\n\nWe received a request to reset your password.\n\nClick this link to reset your password:\n${resetUrl}\n\nThis link will expire in 15 minutes.\n\nIf you didn't request this, you can safely ignore this email.\n\n— The AlgoSprint Team`,
+    }).catch((emailError) => {
+      console.error("⚠️ Email sending failed:", emailError.message);
+    });
+
+    return res.json({
+      message: "If the email exists, a reset link has been sent",
+    });
+  } catch (err) {
+    console.error("❌ Forgot password error:", err);
+    return res.status(500).json({
+      message: "Something went wrong. Please try again.",
+    });
+  }
 };
 
-// Reset Password
+// ✅ FIXED RESET PASSWORD
 const resetPassword = async (req, res) => {
-  const { password } = req.body;
-  const { token } = req.params;
-   if (!password) {
-    return res.status(400).json({ message: "Password is required" });
+  try {
+    const { password } = req.body;
+    const { token } = req.params;
+
+    console.log("🔐 Reset password attempt");
+
+    if (!password) {
+      return res.status(400).json({ message: "Password is required" });
+    }
+
+    if (password.length < 8) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 8 characters" });
+    }
+
+    // ✅ Find user with PLAIN token (no hashing)
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      console.log("❌ Invalid or expired token");
+      return res.status(400).json({
+        message: "Invalid or expired reset link",
+      });
+    }
+
+    console.log("Valid token found for user:", user._id);
+
+    // Update password (pre-save hook will hash it)
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    await user.save();
+
+    console.log("✅ Password reset successful for user:", user._id);
+
+    return res.json({
+      message: "Password reset successful. You can now login.",
+    });
+  } catch (err) {
+    console.error("❌ Reset password error:", err);
+    return res.status(500).json({
+      message: "Something went wrong. Please try again.",
+    });
   }
-console.log("RAW token from URL:", token);
-
-const hashedToken = crypto
-  .createHash("sha256")
-  .update(token)
-  .digest("hex");
-
-console.log("HASHED token:", hashedToken);
-console.log("Current time:", Date.now());
-const anyUser = await User.findOne({});
-console.log("DB token:", anyUser?.resetPasswordToken);
-console.log("DB expiry:", anyUser?.resetPasswordExpires);
-
-  const user = await User.findOne({
-    resetPasswordToken: hashedToken,
-    resetPasswordExpires: { $gt: Date.now() },
-  });
-
-  if (!user) {
-    return res.status(400).json({ message: "Invalid or expired token" });
-  }
-
-  // 🔐 hash new password
-user.password = password; // pre-save hook will hash it
-  // 🔑 Replace old password
-  user.resetPasswordToken = undefined;
-  user.resetPasswordExpires = undefined;
-
-  await user.save();
-
-  res.json({ message: "Password reset successful" });
 };
-
 
 // logOut feature
-
 const logout = async(req,res)=>{
 
     try{

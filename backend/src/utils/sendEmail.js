@@ -1,5 +1,4 @@
 const { Resend } = require('resend');
-
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async ({ to, subject, html, text }) => {
@@ -7,7 +6,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
     console.log("📧 Sending email via Resend to:", to);
     
     const data = await resend.emails.send({
-      from: 'AlgoSprint <onboarding@resend.dev>', // Use their domain initially
+      from: 'AlgoSprint <AlgoSprint@resend.dev>', // Use their domain initially
       to: [to],
       subject,
       html,
