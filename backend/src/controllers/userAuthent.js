@@ -79,8 +79,8 @@ const register = async (req, res) => {
     });
 
     // Send email AFTER response (fire and forget)
-    const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
-    // const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+    // const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
     
     sendEmail({
       to: emailId,
@@ -223,8 +223,8 @@ const resendVerification = async (req, res) => {
     user.emailVerificationExpires = Date.now() + 1000 * 60 * 60; // 1 hour
     await user.save();
 
-    const verifyUrl = `${process.env.CLIENT_URL}/user/verify-email/${token}`;
-    // const verifyUrl = `${process.env.FRONTEND_URL}/user/verify-email/${token}`;
+    // const verifyUrl = `${process.env.CLIENT_URL}/user/verify-email/${token}`;
+    const verifyUrl = `${process.env.FRONTEND_URL}/user/verify-email/${token}`;
 
     await sendEmail({
       to: emailId,
