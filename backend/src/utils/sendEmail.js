@@ -1,45 +1,23 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require('resend');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async ({ to, subject, html, text }) => {
   try {
-    console.log("📧 Starting email send to:", to);
-    console.log("📧 SMTP Config:", {
-      host: process.env.HOST,
-      port: process.env.EMAIL_PORT,
-      user: process.env.EMAIL_USER,
-      hasPassword: !!process.env.EMAIL_PASS
-    });
-
-    const transporter = nodemailer.createTransport({
-      host: process.env.HOST,
-      port: Number(process.env.EMAIL_PORT),
-      secure: process.env.SECURE === "true",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      // Add these for better debugging
-      logger: true,
-      debug: true,
-    });
-
-    console.log("📧 Verifying SMTP connection...");
-    await transporter.verify();
-    console.log("✅ SMTP connection verified");
+    console.log("📧 Sending email via Resend to:", to);
     
-    const info = await transporter.sendMail({
-      from: `"AlgoSprint" <${process.env.EMAIL_USER}>`,
-      to,
+    const data = await resend.emails.send({
+      from: 'AlgoSprint <onboarding@resend.dev>', // Use their domain initially
+      to: [to],
       subject,
       html,
-      text,
     });
 
-    console.log("✅ Email sent successfully:", info.messageId);
-    return info;
+    console.log("✅ Email sent successfully via Resend:", data.id);
+    return data;
   } catch (error) {
-    console.error("❌ Email sending failed:", error);
-    throw error;
+    console.error("❌ Resend error:", error);
+    throw new Error(error.message || "Email sending failed");
   }
 };
 
