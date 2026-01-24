@@ -27,7 +27,7 @@ const createProblem = async (req, res) => {
                     source_code: completeCode,
                     language_id: languageId,
                     stdin: processedInput,
-                    expected_output: convertExpectedOutputForJudge0(testcase.output),  // ✅ Format here too
+                    // expected_output: convertExpectedOutputForJudge0(testcase.output),  // ✅ Format here too
 
                 };
             });
