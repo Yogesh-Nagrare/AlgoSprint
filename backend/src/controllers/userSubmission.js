@@ -2,7 +2,9 @@ const Problem = require("../models/problem");
 const Submission = require("../models/submission");
 const {getLanguageById,submitBatch,submitToken} = require("../utils/ProblemUtility");
 const { preprocessInput } = require("../utils/InputParser");
-const {  compareOutputs,convertExpectedOutputForJudge0} = require('../utils/OutputNormalizer');
+const { compareOutputs } = require('../utils/OutputNormalizer');
+const { wrapCode } = require('../utils/CodeWrapper');
+
 const submitCode = async (req,res)=>{
     try{
        const userId = req.result._id;
@@ -15,7 +17,24 @@ const submitCode = async (req,res)=>{
       if(language==='cpp')
         language='c++'
 
-       const problem =  await Problem.findById(problemId);
+       const problem = await Problem.findById(problemId);
+
+       // Get function signature for this language
+       const functionSig = problem.functionSignature?.find(
+           sig => sig.language.toLowerCase() === language.toLowerCase()
+       );
+       
+       // Wrap the user's code with main() function
+       let wrappedCode = code;
+       if (functionSig) {
+           wrappedCode = wrapCode(
+               code, 
+               language, 
+               functionSig.signature,
+               'auto', // inputFormat (can be enhanced)
+               'auto'  // outputFormat (can be enhanced)
+           );
+       }
 
        const submittedResult = await Submission.create({
           userId,
@@ -28,12 +47,10 @@ const submitCode = async (req,res)=>{
 
     const languageId = getLanguageById(language);
 
-    // ✅ Remove expected_output - just run the code
     const submissions = problem.hiddenTestCases.map((testcase)=>({
-        source_code:code,
+        source_code: wrappedCode,  // Use wrapped code
         language_id: languageId,
         stdin: preprocessInput(testcase.input)
-        // No expected_output!
     }));
 
     const submitResult = await submitBatch(submissions);
@@ -49,7 +66,6 @@ const submitCode = async (req,res)=>{
     for(let i = 0; i < testResult.length; i++){
         const test = testResult[i];
         
-        // Check for compilation/runtime errors
         if(test.status_id === 6){
             status = 'error';
             errorMessage = test.compile_output || test.stderr;
@@ -59,13 +75,11 @@ const submitCode = async (req,res)=>{
             errorMessage = test.stderr;
             break;
         } else if(test.status_id !== 3) {
-            // Some other error
             status = 'error';
             errorMessage = test.status?.description || 'Unknown error';
             break;
         }
         
-        // ✅ Do manual comparison
         const expectedOutput = problem.hiddenTestCases[i].output;
         const actualOutput = test.stdout;
         
@@ -110,6 +124,7 @@ const submitCode = async (req,res)=>{
         res.status(500).send("Internal Server Error: " + err.message);
     }
 }
+
 const runCode = async (req,res)=>{
     try{
        const userId = req.result._id;
@@ -124,11 +139,26 @@ const runCode = async (req,res)=>{
       if(language==='cpp')
         language='c++'
 
+      // Get function signature and wrap code
+      const functionSig = problem.functionSignature?.find(
+          sig => sig.language.toLowerCase() === language.toLowerCase()
+      );
+      
+      let wrappedCode = code;
+      if (functionSig) {
+          wrappedCode = wrapCode(
+              code, 
+              language, 
+              functionSig.signature,
+              'auto',
+              'auto'
+          );
+      }
+
       const languageId = getLanguageById(language);
 
-      // ✅ No expected_output
       const submissions = problem.visibleTestCases.map((testcase)=>({
-          source_code:code,
+          source_code: wrappedCode,  // Use wrapped code
           language_id: languageId,
           stdin: preprocessInput(testcase.input)
       }));
@@ -161,7 +191,6 @@ const runCode = async (req,res)=>{
               testError = test.status?.description || 'Unknown error';
               overallSuccess = false;
           } else {
-              // ✅ Manual comparison
               const comparison = compareOutputs(test.stdout, testcase.output);
               
               if(comparison.match){
@@ -185,7 +214,7 @@ const runCode = async (req,res)=>{
               memory: test.memory,
               explanation: testcase.explanation,
               error: testError,
-              testStatus: testStatus  // Add this for frontend
+              testStatus: testStatus
           };
       });
 
@@ -203,9 +232,8 @@ const runCode = async (req,res)=>{
         res.status(500).send("Internal Server Error: " + err.message);
     }
 };
+
 module.exports = {submitCode,runCode};
-
-
 
 //     language_id: 54,
 //     stdin: '2 3',

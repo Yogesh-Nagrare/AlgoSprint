@@ -15,11 +15,12 @@ const problemSchema = new Schema({
         enum:['easy','medium','hard'],
         required:true,
     },
-    tags:{
-        type:String,
-        enum:['array','linkedList','graph','dp'],
-        required:true
-    },
+tags: {
+    type: String,
+    enum: ['array','linkedList','graph','Sliding Window','Greedy Algorithm','Binary Search','Tree','Backtracking','Sorting','Recursion','Hash Table','Stack','Queue','Heap','Bit Manipulation','Math','Two Pointers','Graph Traversal','Trie','Union Find','Segment Tree','Matrix','String','Binary Tree','Depth-First Search','Breadth-First Search'
+    ],
+    required: true
+},
     visibleTestCases:[
         {
             input:{
@@ -36,7 +37,6 @@ const problemSchema = new Schema({
             }
         }
     ],
-
     hiddenTestCases:[
         {
             input:{
@@ -49,7 +49,22 @@ const problemSchema = new Schema({
             }
         }
     ],
-
+    
+    // NEW: Store function signature for each language
+    functionSignature: [
+        {
+            language: {
+                type: String,
+                required: true,
+            },
+            signature: {
+                type: String,
+                required: true,
+                // Example: "void rotate(vector<int>& nums, int k)"
+            }
+        }
+    ],
+    
     startCode: [
         {
             language:{
@@ -59,20 +74,20 @@ const problemSchema = new Schema({
             initialCode:{
                 type:String,
                 required:true
+                // Now stores LeetCode-style class template
             }
         }
     ],
-
     referenceSolution:[
         {       
             language:{
                 type:String,
                 required:true,      
-
             },
             completeCode:{
                 type:String,
                 required:true
+                // Now stores LeetCode-style class solution
             }
         }
     ],
@@ -81,12 +96,10 @@ const problemSchema = new Schema({
         ref:'user',
         required:true
     },
-    // NEW FIELDS for external platform links
-  leetcodeLink: { type: String, default: null },
-  gfgLink: { type: String, default: null },
-  interviewbitLink: { type: String, default: null }
+    leetcodeLink: { type: String, default: null },
+    gfgLink: { type: String, default: null },
+    interviewbitLink: { type: String, default: null }
 })
-
 
 const Problem = mongoose.model('problem',problemSchema);
 

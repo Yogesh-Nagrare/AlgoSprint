@@ -6,29 +6,73 @@ const User = require("../models/user");
 const mongoose = require("mongoose");
 const Submission = require("../models/submission");
 const solutionVideo = require('../models/solutionVideo');
+const { wrapCode } = require("../utils/CodeWrapper");
 
 const createProblem = async (req, res) => {
-    const { title, description, difficulty, tags, visibleTestCases, hiddenTestCases, startCode, referenceSolution } = req.body;
+    const { 
+        title, 
+        description, 
+        difficulty, 
+        tags, 
+        visibleTestCases, 
+        hiddenTestCases, 
+        startCode, 
+        referenceSolution,
+        functionSignature
+    } = req.body;
 
     try {
+        // Validate each reference solution
         for (const { language, completeCode } of referenceSolution) {
             const languageId = getLanguageById(language);
+
+            // Get function signature for this language
+            const functionSig = functionSignature?.find(
+                sig => sig.language.toLowerCase() === language.toLowerCase()
+            );
+            
+            if (!functionSig) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Function signature missing for ${language}`
+                });
+            }
+
+            console.log(`\n=== Testing ${language} Reference Solution ===`);
+            console.log("Original Code:", completeCode);
+            console.log("Function Signature:", functionSig.signature);
+
+            // Wrap the reference solution with main() function
+            let wrappedCode;
+            try {
+                wrappedCode = wrapCode(
+                    completeCode,
+                    language,
+                    functionSig.signature,
+                    'auto',
+                    'auto'
+                );
+                console.log("Wrapped Code:", wrappedCode);
+            } catch (wrapError) {
+                console.error("Code Wrapping Error:", wrapError);
+                return res.status(400).json({
+                    success: false,
+                    message: `Failed to wrap code for ${language}`,
+                    details: wrapError.message
+                });
+            }
 
             const submissions = visibleTestCases.map((testcase) => {
                 const processedInput = preprocessInput(testcase.input);
                 
-                console.log(`\n=== ${language} Test Case ===`);
-                console.log("Original Input:", testcase.input);
-                console.log("Processed Input:", processedInput);
-                console.log("Expected Output (original):", testcase.output);
-                console.log("Expected Output (formatted):", convertExpectedOutputForJudge0(testcase.output));
+                console.log(`\nTest Case Input:`, testcase.input);
+                console.log(`Processed Input:`, processedInput);
+                console.log(`Expected Output:`, testcase.output);
                 
                 return {
-                    source_code: completeCode,
+                    source_code: wrappedCode,
                     language_id: languageId,
                     stdin: processedInput,
-                    // expected_output: convertExpectedOutputForJudge0(testcase.output),  // ✅ Format here too
-
                 };
             });
 
@@ -42,6 +86,8 @@ const createProblem = async (req, res) => {
             }
             
             const resultToken = submitResult.map((value) => value.token);
+            console.log(`Submission tokens:`, resultToken);
+            
             const testResult = await submitToken(resultToken);
             
             console.log(`${language} Results:`, JSON.stringify(testResult, null, 2));
@@ -50,13 +96,14 @@ const createProblem = async (req, res) => {
                 const test = testResult[i];
                 const expectedOutput = visibleTestCases[i].output;
                 
-                // Check for compilation/runtime errors first
+                // Check for compilation/runtime errors
                 if (test.status_id === 6) {
                     return res.status(400).json({
                         success: false,
                         message: `Compilation Error for ${language}`,
-                        details: "Compilation failed",
+                        details: test.compile_output || test.stderr || "Compilation failed",
                         stderr: test.compile_output || test.stderr || "",
+                        wrappedCode: wrappedCode
                     });
                 }
                 
@@ -66,10 +113,11 @@ const createProblem = async (req, res) => {
                         message: `Runtime Error for ${language}`,
                         details: test.status?.description || "Runtime Error",
                         stderr: test.stderr || "",
+                        wrappedCode: wrappedCode
                     });
                 }
                 
-                // Smart comparison with auto-formatting
+                // Compare outputs
                 const comparison = compareOutputs(test.stdout, expectedOutput);
                 
                 console.log(`\n📊 Test ${i + 1} Comparison:`);
@@ -79,7 +127,6 @@ const createProblem = async (req, res) => {
                 console.log("  Formatted Expected:", comparison.formattedExpected);
                 console.log("  Match:            ", comparison.match ? "✅" : "❌");
                 
-                // Verify output matches
                 if (!comparison.match) {
                     return res.status(400).json({
                         success: false,
@@ -88,12 +135,14 @@ const createProblem = async (req, res) => {
                         stdout: test.stdout || "",
                         expectedOutput: expectedOutput,
                         formattedActual: comparison.formattedActual,
-                        formattedExpected: comparison.formattedExpected
+                        formattedExpected: comparison.formattedExpected,
+                        wrappedCode: wrappedCode
                     });
                 }
             }
         }
 
+        // All tests passed, create the problem
         const newProblem = await Problem.create({
             title,
             description,
@@ -103,6 +152,7 @@ const createProblem = async (req, res) => {
             hiddenTestCases,
             startCode,
             referenceSolution,
+            functionSignature,
             problemCreator: req.result._id,
         });
 
@@ -114,6 +164,8 @@ const createProblem = async (req, res) => {
 
     } catch (error) {
         console.error("Create Problem Error:", error);
+        console.error("Error Response:", error.response?.data);
+        console.error("Error Status:", error.response?.status);
 
         if (error.response && error.response.status === 429) {
             return res.status(429).json({
@@ -123,13 +175,26 @@ const createProblem = async (req, res) => {
             });
         }
 
+        if (error.response && error.response.status === 400) {
+            return res.status(500).json({
+                success: false,
+                message: "Judge0 rejected the code",
+                details: error.response.data?.message || error.message,
+                error: error.message
+            });
+        }
+
         res.status(500).json({
             success: false,
             message: "Internal Server Error",
-            error: error.message
+            error: error.message,
+            details: error.response?.data?.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 }
+
+module.exports = { createProblem };
 
 const updateProblem = async (req, res) => {
     const { id } = req.params;

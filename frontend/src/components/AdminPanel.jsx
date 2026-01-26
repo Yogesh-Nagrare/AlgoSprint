@@ -5,13 +5,13 @@ import axiosClient from '../utils/axiosClient';
 import { useNavigate } from 'react-router';
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Code2, Beaker, FileText, ChevronLeft, Save } from 'lucide-react';
+import { Plus, Trash2, Code2, Beaker, FileText, ChevronLeft, Save, Signature } from 'lucide-react';
 
 const problemSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
   difficulty: z.enum(['easy', 'medium', 'hard']),
-  tags: z.enum(['array', 'linkedList', 'graph', 'dp']),
+  tags: z.enum(['array', 'linkedList', 'graph','Sliding Window', 'Greedy Algorithm', 'Binary Search', 'Tree', 'Backtracking', 'Sorting', 'Recursion', 'Hash Table', 'Stack', 'Queue', 'Heap', 'Bit Manipulation', 'Math', 'Two Pointers', 'Graph Traversal', 'Trie', 'Union Find', 'Segment Tree', 'Matrix', 'String','Binary Tree', 'Depth-First Search', 'Breadth-First Search']),
   visibleTestCases: z.array(
     z.object({
       input: z.string().min(1, 'Input is required'),
@@ -25,6 +25,13 @@ const problemSchema = z.object({
       output: z.string().min(1, 'Output is required')
     })
   ).min(1, 'At least one hidden test case required'),
+  // NEW: Function Signature field
+  functionSignature: z.array(
+    z.object({
+      language: z.enum(['C++', 'Java', 'JavaScript']),
+      signature: z.string().min(1, 'Function signature is required')
+    })
+  ).length(3),
   startCode: z.array(
     z.object({
       language: z.enum(['C++', 'Java', 'JavaScript']),
@@ -47,6 +54,12 @@ function AdminPanel({ defaultProblem }) {
       title: '', description: '', difficulty: 'easy', tags: 'array',
       visibleTestCases: [{ input: '', output: '', explanation: '' }],
       hiddenTestCases: [{ input: '', output: '' }],
+      // NEW: Default function signatures
+      functionSignature: [
+        { language: 'C++', signature: '' },
+        { language: 'Java', signature: '' },
+        { language: 'JavaScript', signature: '' }
+      ],
       startCode: [
         { language: 'C++', initialCode: '' },
         { language: 'Java', initialCode: '' },
@@ -70,31 +83,29 @@ function AdminPanel({ defaultProblem }) {
     if (defaultProblem.hiddenTestCases) replaceHidden(defaultProblem.hiddenTestCases);
   }, [defaultProblem, reset, replaceVisible, replaceHidden]);
 
-const onSubmit = async (data) => {
-  //  LOG 1: See the raw data from the form
-  console.log("1. Form Data:", data);
+  const onSubmit = async (data) => {
+    console.log("1. Form Data:", data);
 
-  const { _id, __v, createdAt, updatedAt, ...cleanData } = data;
-  
-  //  LOG 2: See the cleaned data actually being sent
-  console.log("2. Sending to Server:", cleanData);
-
-  try {
-    const isUpdate = !!defaultProblem?._id;
-    const endpoint = isUpdate ? `/problem/update/${defaultProblem._id}` : '/problem/create';
-    const method = isUpdate ? 'put' : 'post';
-
-    await axiosClient[method](endpoint, cleanData);
-    alert('Success!');
-    navigate('/admin');
-  } catch (error) {
-    // 🔴 LOG 3: See the full error object from the server
-    console.error("3. Server Error Object:", error.response);
-    console.log("4. Server Error Data:", error.response?.data);
+    const { _id, __v, createdAt, updatedAt, ...cleanData } = data;
     
-    alert("Check the browser console (F12) for the full error logs.");
-  }
-};
+    console.log("2. Sending to Server:", cleanData);
+
+    try {
+      const isUpdate = !!defaultProblem?._id;
+      const endpoint = isUpdate ? `/problem/update/${defaultProblem._id}` : '/problem/create';
+      const method = isUpdate ? 'put' : 'post';
+
+      await axiosClient[method](endpoint, cleanData);
+      alert('Success!');
+      navigate('/admin');
+    } catch (error) {
+      console.error("3. Server Error Object:", error.response);
+      console.log("4. Server Error Data:", error.response?.data);
+      
+      alert("Check the browser console (F12) for the full error logs.");
+    }
+  };
+
   const SectionHeader = ({ icon: Icon, title, subtitle }) => (
     <div className="flex items-center gap-4 mb-8">
       <div className="p-3 bg-orange-500/10 rounded-2xl text-orange-500">
@@ -106,6 +117,31 @@ const onSubmit = async (data) => {
       </div>
     </div>
   );
+
+  // Quick template suggestions for function signatures
+  const getSignatureTemplates = (lang) => {
+    const templates = {
+      'C++': [
+        'void rotate(vector<int>& nums, int k)',
+        'vector<int> twoSum(vector<int>& nums, int target)',
+        'int maxProfit(vector<int>& prices)',
+        'bool isPalindrome(string s)'
+      ],
+      'Java': [
+        'void rotate(int[] nums, int k)',
+        'int[] twoSum(int[] nums, int target)',
+        'int maxProfit(int[] prices)',
+        'boolean isPalindrome(String s)'
+      ],
+      'JavaScript': [
+        'rotate(nums: number[], k: number): void',
+        'twoSum(nums: number[], target: number): number[]',
+        'maxProfit(prices: number[]): number',
+        'isPalindrome(s: string): boolean'
+      ]
+    };
+    return templates[lang] || [];
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-200 pb-20">
@@ -160,10 +196,33 @@ const onSubmit = async (data) => {
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">Topic Category</label>
                 <select {...register('tags')} className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 focus:ring-1 focus:ring-orange-500 outline-none text-white font-bold appearance-none cursor-pointer">
-                  <option value="array">Arrays</option>
-                  <option value="linkedList">Linked List</option>
-                  <option value="graph">Graphs</option>
                   <option value="dp">Dynamic Programming</option>
+                  <option value="array">Array</option>
+                  <option value="linkedList">Linked List</option>
+                  <option value="graph">Graph</option>
+                  <option value="Sliding Window">Sliding Window</option>
+                  <option value="Greedy Algorithm">Greedy Algorithm</option>
+                  <option value="Binary Search">Binary Search</option>
+                  <option value="Tree">Tree</option>
+                  <option value="Backtracking">Backtracking</option>
+                  <option value="Sorting">Sorting</option>
+                  <option value="Recursion">Recursion</option>
+                  <option value="Hash Table">Hash Table</option>
+                  <option value="Stack">Stack</option>
+                  <option value="Queue">Queue</option>
+                  <option value="Heap">Heap</option>
+                  <option value="Bit Manipulation">Bit Manipulation</option>
+                  <option value="Math">Math</option>
+                  <option value="Two Pointers">Two Pointers</option>
+                  <option value="Graph Traversal">Graph Traversal</option>
+                  <option value="Trie">Trie</option>
+                  <option value="Union Find">Union Find</option>
+                  <option value="Segment Tree">Segment Tree</option>
+                  <option value="Matrix">Matrix</option>
+                  <option value="String">String</option>
+                  <option value="Binary Tree">Binary Tree</option>
+                  <option value="Depth-First Search">Depth-First Search</option>
+                  <option value="Breadth-First Search">Breadth-First Search</option>
                 </select>
               </div>
             </div>
@@ -175,7 +234,7 @@ const onSubmit = async (data) => {
             
             <div className="space-y-10">
               {/* Visible Cases */}
-<div className="space-y-6">
+              <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
                   <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Visible Cases</h3>
                   <button type="button" onClick={() => appendVisible({ input: '', output: '', explanation: '' })} className="text-orange-500 text-xs font-black">
@@ -192,13 +251,13 @@ const onSubmit = async (data) => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <textarea 
                           {...register(`visibleTestCases.${index}.input`)} 
-                          placeholder="Input: Use [1,2,3] or plain text like '3\n1 2 3'" 
+                          placeholder="Input: nums = [1,2,3,4,5], k = 2" 
                           className="bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-sm font-mono h-24 resize-none" 
                           onKeyDown={(e) => e.stopPropagation()} 
                         />
                         <textarea 
                           {...register(`visibleTestCases.${index}.output`)} 
-                          placeholder="Expected Output" 
+                          placeholder="Output: [4,5,1,2,3]" 
                           className="bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-sm font-mono h-24 resize-none" 
                           onKeyDown={(e) => e.stopPropagation()}
                         />
@@ -208,7 +267,6 @@ const onSubmit = async (data) => {
                   ))}
                 </div>
               </div>
-
 
               {/* Hidden Cases */}
               <div className="space-y-6">
@@ -231,14 +289,15 @@ const onSubmit = async (data) => {
             </div>
           </motion.section>
 
-
-          {/* SECTION 3: CODE TEMPLATES */}
+          {/* SECTION 3: CODE TEMPLATES & FUNCTION SIGNATURES */}
           <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#111] rounded-[2.5rem] border border-white/5 p-10">
-            <SectionHeader icon={Code2} title="Code Templates" subtitle="Polyglot Boilerplate & Solutions" />
+            <SectionHeader icon={Code2} title="Code Templates" subtitle="LeetCode-Style Function Signatures & Solutions" />
             
             <div className="space-y-12">
               {[0, 1, 2].map((index) => {
                 const lang = index === 0 ? 'C++' : index === 1 ? 'Java' : 'JavaScript';
+                const templates = getSignatureTemplates(lang);
+                
                 return (
                   <div key={index} className="space-y-6 border-l-2 border-white/5 pl-8 ml-2">
                     <div className="flex items-center gap-3">
@@ -246,14 +305,61 @@ const onSubmit = async (data) => {
                       <h3 className="font-black text-white uppercase tracking-[0.2em] text-xs">{lang} Configuration</h3>
                     </div>
                     
+                    {/* NEW: Function Signature Field */}
+                    <div className="space-y-2 bg-black/20 border border-orange-500/20 rounded-2xl p-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Signature size={16} className="text-orange-500" />
+                        <label className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">Function Signature (Required)</label>
+                      </div>
+                      
+                      <input 
+                        {...register(`functionSignature.${index}.signature`)} 
+                        className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 font-mono text-sm text-cyan-400 focus:border-orange-500/50 outline-none" 
+                        placeholder={templates[0] || `e.g., void rotate(vector<int>& nums, int k)`}
+                      />
+                      
+                      {errors.functionSignature?.[index]?.signature && (
+                        <p className="text-red-500 text-[10px] font-bold mt-1">{errors.functionSignature[index].signature.message}</p>
+                      )}
+                      
+                      {/* Quick Templates */}
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <span className="text-[9px] text-gray-600 uppercase tracking-wider mr-2">Quick:</span>
+                        {templates.map((template, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              const currentValues = watch('functionSignature');
+                              currentValues[index].signature = template;
+                              reset({ ...watch(), functionSignature: currentValues });
+                            }}
+                            className="text-[9px] px-2 py-1 bg-white/5 hover:bg-white/10 rounded-md text-gray-400 hover:text-orange-500 transition-colors"
+                          >
+                            {template.split('(')[0]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 ml-1">STARTING TEMPLATE</label>
-                        <textarea {...register(`startCode.${index}.initialCode`)} className="w-full bg-black border border-white/10 rounded-2xl p-6 font-mono text-xs leading-relaxed h-64 focus:border-orange-500/50 outline-none text-emerald-400" placeholder={`// ${lang} initial code here...`} />
+                        <label className="text-[10px] font-bold text-gray-500 ml-1">STARTING TEMPLATE (LeetCode-style class)</label>
+                        <textarea 
+                          {...register(`startCode.${index}.initialCode`)} 
+                          className="w-full bg-black border border-white/10 rounded-2xl p-6 font-mono text-xs leading-relaxed h-64 focus:border-orange-500/50 outline-none text-emerald-400" 
+                          placeholder={lang === 'C++' ? `class Solution {\npublic:\n    void rotate(vector<int>& nums, int k) {\n        \n    }\n};` : 
+                                     lang === 'Java' ? `class Solution {\n    public void rotate(int[] nums, int k) {\n        \n    }\n}` :
+                                     `class Solution {\n    rotate(nums: number[], k: number): void {\n        \n    }\n}`}
+                        />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 ml-1">REFERENCE SOLUTION</label>
-                        <textarea {...register(`referenceSolution.${index}.completeCode`)} className="w-full bg-black border border-white/10 rounded-2xl p-6 font-mono text-xs leading-relaxed h-64 focus:border-orange-500/50 outline-none text-blue-400" placeholder={`// ${lang} complete solution...`} />
+                        <label className="text-[10px] font-bold text-gray-500 ml-1">REFERENCE SOLUTION (Complete LeetCode-style class)</label>
+                        <textarea 
+                          {...register(`referenceSolution.${index}.completeCode`)} 
+                          className="w-full bg-black border border-white/10 rounded-2xl p-6 font-mono text-xs leading-relaxed h-64 focus:border-orange-500/50 outline-none text-blue-400" 
+                          placeholder={`// ${lang} complete solution in class format...`}
+                        />
                       </div>
                     </div>
                   </div>
