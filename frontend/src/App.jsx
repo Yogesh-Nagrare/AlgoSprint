@@ -24,7 +24,10 @@ import LandingPage from "./pages/LandingPage";
 import TopicSheet from "./pages/TopicSheet";
 import AdminSheet from "./components/AdminSheet";
 import ManageSheets from "./components/ManageSheets";
-import SheetForm from "./pages/SheetForm"
+import SheetForm from "./pages/SheetForm";
+import Problems from "./pages/Problem";
+import LoadingScreen from "./components/LoadingScreen"; // Import it here
+
 function App(){
   
   const dispatch = useDispatch();
@@ -39,9 +42,7 @@ function App(){
   }, [dispatch]);
   const isVerifyPage = window.location.pathname.startsWith("/verify-email");
   if (loading && !isVerifyPage) {
-    return <div className="min-h-screen flex items-center justify-center">
-      <span className="loading loading-spinner loading-lg text-orange-500"></span>
-    </div>;
+    return <LoadingScreen />;
   }
 
   return(
@@ -49,6 +50,7 @@ function App(){
     <Routes>
       <Route path="/auth/callback" element={<AuthCallback />} />
       {/* MODIFIED ROOT ROUTE */}
+      <Route path="/problems" element={<Problems />} />
       <Route 
           path="/" 
           element={isAuthenticated ? <Homepage /> : <LandingPage />} 

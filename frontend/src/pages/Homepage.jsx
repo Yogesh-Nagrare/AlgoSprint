@@ -142,7 +142,11 @@ function Homepage() {
 
           <div className="hidden lg:flex items-center gap-8 ml-4">
             <NavLink to="/" className={({ isActive }) => `text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:text-white relative group ${isActive ? 'text-orange-500' : 'text-gray-500'}`}>
-              Problems
+              Dashboard
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-orange-500 group-hover:w-full transition-all duration-300"></span>
+            </NavLink>
+            <NavLink to="/problems" className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-white transition-all relative group">
+              Problem
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-orange-500 group-hover:w-full transition-all duration-300"></span>
             </NavLink>
             <NavLink to="/contests" className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-white transition-all relative group">
