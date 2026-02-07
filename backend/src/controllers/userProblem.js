@@ -8,7 +8,10 @@ const Submission = require("../models/submission");
 const solutionVideo = require('../models/solutionVideo');
 const { wrapCode } = require("../utils/CodeWrapper");
 
+// ... (Keep all your existing functions: createProblem, updateProblem, deleteProblem, etc.)
+
 const createProblem = async (req, res) => {
+    // ... your existing createProblem code stays the same
     const { 
         title, 
         description, 
@@ -26,7 +29,6 @@ const createProblem = async (req, res) => {
         for (const { language, completeCode } of referenceSolution) {
             const languageId = getLanguageById(language);
 
-            // Get function signature for this language
             const functionSig = functionSignature?.find(
                 sig => sig.language.toLowerCase() === language.toLowerCase()
             );
@@ -42,7 +44,6 @@ const createProblem = async (req, res) => {
             console.log("Original Code:", completeCode);
             console.log("Function Signature:", functionSig.signature);
 
-            // Wrap the reference solution with main() function
             let wrappedCode;
             try {
                 wrappedCode = wrapCode(
@@ -96,7 +97,6 @@ const createProblem = async (req, res) => {
                 const test = testResult[i];
                 const expectedOutput = visibleTestCases[i].output;
                 
-                // Check for compilation/runtime errors
                 if (test.status_id === 6) {
                     return res.status(400).json({
                         success: false,
@@ -117,7 +117,6 @@ const createProblem = async (req, res) => {
                     });
                 }
                 
-                // Compare outputs
                 const comparison = compareOutputs(test.stdout, expectedOutput);
                 
                 console.log(`\n📊 Test ${i + 1} Comparison:`);
@@ -142,7 +141,6 @@ const createProblem = async (req, res) => {
             }
         }
 
-        // All tests passed, create the problem
         const newProblem = await Problem.create({
             title,
             description,
@@ -194,9 +192,8 @@ const createProblem = async (req, res) => {
     }
 }
 
-module.exports = { createProblem };
-
 const updateProblem = async (req, res) => {
+    // ... your existing updateProblem code
     const { id } = req.params;
     const { title, description, difficulty, tags, visibleTestCases, hiddenTestCases, startCode, referenceSolution } = req.body;
 
@@ -217,7 +214,7 @@ const updateProblem = async (req, res) => {
                 source_code: completeCode,
                 language_id: languageId,
                 stdin: preprocessInput(testcase.input),
-                expected_output: convertExpectedOutputForJudge0(testcase.output),  // ✅ Format here too
+                expected_output: convertExpectedOutputForJudge0(testcase.output),
             }));
 
             const submitResult = await submitBatch(submissions);
@@ -304,8 +301,6 @@ const updateProblem = async (req, res) => {
         });
     }
 }
-
-// ... rest of your functions remain the same
 
 const deleteProblem = async(req,res) => {
     const {id} = req.params;
@@ -406,6 +401,59 @@ const submittedProblem = async (req, res) => {
     }
 };
 
+// ========================================
+// 🔥 NEW FUNCTION: Get Problem Status
+// ========================================
+const getProblemStatus = async (req, res) => {
+    try {
+        const userId = req.result._id;
+        const { problemId } = req.params;
+
+        if (!problemId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Problem ID is required" 
+            });
+        }
+
+        const user = req.result;
+        
+        // Initialize arrays if they don't exist (backward compatibility)
+        const problemSolved = user.problemSolved || [];
+        const problemsAttempted = user.problemsAttempted || [];
+        
+        let status = 'untouched';
+        
+        // Check if problem is solved
+        const isSolved = problemSolved.some(id => id.toString() === problemId);
+        
+        if (isSolved) {
+            status = 'solved';
+        } else {
+            // Check if problem is attempted
+            const isAttempted = problemsAttempted.some(id => id.toString() === problemId);
+            if (isAttempted) {
+                status = 'attempted';
+            }
+        }
+
+        console.log(`📊 Problem Status for user ${userId}: ${status}`);
+
+        res.status(200).json({ 
+            success: true,
+            status 
+        });
+        
+    } catch (error) {
+        console.error('Error fetching problem status:', error);
+        res.status(500).json({ 
+            success: false,
+            message: "Internal Server Error",
+            error: error.message 
+        });
+    }
+};
+
 module.exports = {
     createProblem,
     updateProblem,
@@ -413,28 +461,6 @@ module.exports = {
     getProblemById,
     getAllProblem,
     solvedProblembyUser,
-    submittedProblem
+    submittedProblem,
+    getProblemStatus
 };
-// ```
-
-// ---
-
-// ## Key Changes:
-
-// 1. **Removed `expected_output`** from Judge0 submissions - Judge0's comparison was too strict
-// 2. **Added manual comparison** using `normalizeOutput()` - now `[1,3,2]` and `[1, 3, 2]` are treated as equal
-// 3. **Better error handling** - distinguishes between compilation errors, runtime errors, and wrong answers
-// 4. **Detailed logging** - shows exactly what's being compared
-
-// ---
-
-// ## Now Try Updating Your Problem
-
-// After making these changes, check your **backend console** when you update the problem. You'll see output like:
-// ```
-// 📊 Test 1 Comparison:
-//   Raw Actual:    "[1,3,2]"
-//   Raw Expected:  "[1,3,2]"
-//   Norm Actual:   "[1,3,2]"
-//   Norm Expected: "[1,3,2]"
-//   Match:         ✅

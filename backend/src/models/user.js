@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const {Schema} = mongoose;
 const bcrypt = require('bcrypt')
+
 const userSchema = new Schema({
     firstName:{
         type: String,
@@ -22,15 +23,15 @@ const userSchema = new Schema({
         immutable: true,
     },
     googleId: {
-  type: String,
-  sparse: true,
-  unique: true
-},
-authProvider: {
-  type: String,
-  enum: ['local', 'google'],
-  default: 'local'
-},
+        type: String,
+        sparse: true,
+        unique: true
+    },
+    authProvider: {
+        type: String,
+        enum: ['local', 'google'],
+        default: 'local'
+    },
     age:{
         type:Number,
         min:6,
@@ -51,7 +52,6 @@ authProvider: {
         type: Boolean,
         default: false,
     },
-    // models/user.js
     profilePic: {
         type: String,
         default: ""
@@ -62,31 +62,35 @@ authProvider: {
     },
     resetPasswordToken: String,
     resetPasswordExpires: Date,
+    
+    // ===== SOLVED PROBLEMS =====
     problemSolved:{
         type:[{
             type:Schema.Types.ObjectId,
             ref:'problem'
         }],
-        unique:true
+        default: [] // Changed from unique:true (arrays can't be unique)
     },
+    
+    // ===== NEW: ATTEMPTED PROBLEMS (Failed Submissions) =====
+    problemsAttempted:{
+        type:[{
+            type:Schema.Types.ObjectId,
+            ref:'problem'
+        }],
+        default: []
+    },
+    
     password:{
         type:String,
         required: function() {
-        // Password is ONLY required if the authProvider is 'local'
-        // or if there is no googleId
-        return this.authProvider === 'local';
+            return this.authProvider === 'local';
         }
     },
-    // Inside your User Schema
-// sheetSolvedProblems: [
-//     { type: mongoose.Schema.Types.ObjectId }
-// ]
 },{
     timestamps:true
 });
 
-
-//findOneAndDelete method hit ki to ye code run hoga 
 userSchema.post('findOneAndDelete', async function(userInfo) {
     if(userInfo){
         await mongoose.model('Submission').deleteMany({userId: userInfo._id});
@@ -94,16 +98,15 @@ userSchema.post('findOneAndDelete', async function(userInfo) {
 });
 
 userSchema.pre('save', async function(next) {
-  if (this.authProvider === 'google') {
-    return next(); // Skip password hashing for Google users
-  }
-  
-  if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 10);
-  }
-  next();
+    if (this.authProvider === 'google') {
+        return next();
+    }
+    
+    if (this.isModified('password')) {
+        this.password = await bcrypt.hash(this.password, 10);
+    }
+    next();
 });
-
 
 const User = mongoose.model("user",userSchema);
 

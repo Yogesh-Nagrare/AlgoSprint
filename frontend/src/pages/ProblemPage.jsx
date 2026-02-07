@@ -29,7 +29,9 @@ import {
     Filter,
     Check,
     Timer as TimerIcon,
-    Pause // Added Pause Icon
+    Pause, // Added Pause Icon
+    AlertCircle // <--- ADD THIS
+
 } from 'lucide-react';
 
 const langMap = {
@@ -41,6 +43,7 @@ const langMap = {
 const ProblemPage = () => {
     const dispatch = useDispatch();
     const { problemId } = useParams();
+    const [problemStatus, setProblemStatus] = useState('untouched'); // <--- ADD THIS
     const [copiedId, setCopiedId] = useState(null);
     const editorState = useSelector((state) => state.editor) || {};
     const userCode = editorState.userCode || {};
@@ -226,7 +229,17 @@ const ProblemPage = () => {
             }
         }
     }, [selectedLanguage, problem, problemId]); 
-
+    useEffect(() => {
+        const fetchStatus = async () => {
+            try {
+                const response = await axiosClient.get(`/problem/status/${problemId}`);
+                setProblemStatus(response.data.status);
+            } catch (error) {
+                console.error('Error fetching status:', error);
+            }
+        };
+        fetchStatus();
+    }, [problemId]);
     const handleResetCode = () => {
         if (!problem) return;
         const defaultInitial = problem.startCode.find(
@@ -276,6 +289,9 @@ const ProblemPage = () => {
         try {
             const response = await axiosClient.post(`/submission/submit/${problemId}`, { code, language: selectedLanguage });
             setSubmitResult(response.data);
+            if (response.data.problemStatus) {
+            setProblemStatus(response.data.problemStatus);
+        }
             setLoading(false);
         } catch (error) {
             setLoading(false);
@@ -291,7 +307,25 @@ const ProblemPage = () => {
             console.error('Failed to copy!', err);
         }
     };
-
+    const getStatusBadge = () => {
+    if (problemStatus === 'solved') {
+        return (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                <CheckCircle2 size={14} className="text-emerald-400" />
+                <span className="text-xs font-bold text-emerald-400 uppercase">Solved</span>
+            </div>
+        );
+    }
+    // else if (problemStatus === 'attempted') {
+    //     return (
+    //         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+    //             <AlertCircle size={14} className="text-amber-400" />
+    //             <span className="text-xs font-bold text-amber-400 uppercase">Attempted</span>
+    //         </div>
+    //     );
+    // }
+    return null;
+};
     const getDifficultyColor = (difficulty) => {
         switch (difficulty?.toLowerCase()) {
             case 'easy': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
@@ -396,15 +430,23 @@ const ProblemPage = () => {
                             <div className="max-w-3xl mx-auto h-full">
                                 {activeLeftTab === 'description' && (
                                     <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                                        <h1 className="text-3xl font-bold text-white mb-4 tracking-tight">{problem.title}</h1>
-                                        <div className="flex items-center gap-3 mb-8">
-                                            <span className={`px-4 py-1 rounded-full text-xs font-bold border ${getDifficultyColor(problem.difficulty)}`}>
-                                                {problem.difficulty}
-                                            </span>
-                                            <span className="text-gray-500 text-xs flex items-center gap-1">
-                                                <History size={12} /> 1.2k Submissions
-                                            </span>
-                                        </div>
+{/* Title row with Status Badge on the far right */}
+<div className="flex items-center justify-between mb-4">
+    <h1 className="text-3xl font-bold text-white tracking-tight">
+        {problem.title}
+    </h1>
+    <div>{getStatusBadge()}</div>
+</div>
+
+{/* Metadata row (Difficulty and Submissions) */}
+<div className="flex items-center gap-3 mb-8">
+    <span className={`px-4 py-1 rounded-full text-xs font-bold border ${getDifficultyColor(problem.difficulty)}`}>
+        {problem.difficulty}
+    </span>
+    <span className="text-gray-500 text-xs flex items-center gap-1">
+        <History size={12} /> 1.2k Submissions
+    </span>
+</div>
                                         <div className="text-gray-300 leading-relaxed text-[16px] space-y-6 mb-12 font-normal">
                                             {problem.description.split('\n').map((para, i) => (
                                                 <p key={i}>{para}</p>

@@ -3,8 +3,26 @@ const express = require('express');
 const problemRouter = express.Router();
 const adminMiddleware = require("../middleware/adminMiddleware");
 const userMiddleware = require("../middleware/userMiddleware");
-const {createProblem, updateProblem, deleteProblem, getProblemById, getAllProblem, solvedProblembyUser, submittedProblem} = require("../controllers/userProblem");
-const {getAllSheets, getSheetBySlug, createSheet, updateSheet, deleteSheet, markProblemSolved, unmarkProblemSolved} = require("../controllers/sheetController");
+const {
+    createProblem, 
+    updateProblem, 
+    deleteProblem, 
+    getProblemById, 
+    getAllProblem, 
+    solvedProblembyUser, 
+    submittedProblem,
+    getProblemStatus  // 🔥 Import the new function
+} = require("../controllers/userProblem");
+
+const {
+    getAllSheets, 
+    getSheetBySlug, 
+    createSheet, 
+    updateSheet, 
+    deleteSheet, 
+    markProblemSolved, 
+    unmarkProblemSolved
+} = require("../controllers/sheetController");
 
 // Problem Routes
 // Create (admin only)
@@ -19,6 +37,11 @@ problemRouter.get("/problemById/:id", userMiddleware, getProblemById);
 problemRouter.get("/getAllProblem/", userMiddleware, getAllProblem);
 problemRouter.get("/problemSolvedByUser", userMiddleware, solvedProblembyUser);
 problemRouter.get("/submittedProblem/:pid", userMiddleware, submittedProblem);
+
+// ========================================
+// 🔥 NEW ROUTE: Get Problem Status
+// ========================================
+problemRouter.get("/status/:problemId", userMiddleware, getProblemStatus);
 
 // Sheet Routes
 // User routes - fetch sheet data
