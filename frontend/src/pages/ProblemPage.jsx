@@ -430,23 +430,23 @@ const ProblemPage = () => {
                             <div className="max-w-3xl mx-auto h-full">
                                 {activeLeftTab === 'description' && (
                                     <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-{/* Title row with Status Badge on the far right */}
-<div className="flex items-center justify-between mb-4">
-    <h1 className="text-3xl font-bold text-white tracking-tight">
-        {problem.title}
-    </h1>
-    <div>{getStatusBadge()}</div>
-</div>
+                                        {/* Title row with Status Badge on the far right */}
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h1 className="text-3xl font-bold text-white tracking-tight">
+                                                {problem.title}
+                                            </h1>
+                                            <div>{getStatusBadge()}</div>
+                                        </div>
 
-{/* Metadata row (Difficulty and Submissions) */}
-<div className="flex items-center gap-3 mb-8">
-    <span className={`px-4 py-1 rounded-full text-xs font-bold border ${getDifficultyColor(problem.difficulty)}`}>
-        {problem.difficulty}
-    </span>
-    <span className="text-gray-500 text-xs flex items-center gap-1">
-        <History size={12} /> 1.2k Submissions
-    </span>
-</div>
+                                        {/* Metadata row (Difficulty and Submissions) */}
+                                        <div className="flex items-center gap-3 mb-8">
+                                            <span className={`px-4 py-1 rounded-full text-xs font-bold border ${getDifficultyColor(problem.difficulty)}`}>
+                                                {problem.difficulty}
+                                            </span>
+                                            <span className="text-gray-500 text-xs flex items-center gap-1">
+                                                <History size={12} /> 1.2k Submissions
+                                            </span>
+                                        </div>
                                         <div className="text-gray-300 leading-relaxed text-[16px] space-y-6 mb-12 font-normal">
                                             {problem.description.split('\n').map((para, i) => (
                                                 <p key={i}>{para}</p>

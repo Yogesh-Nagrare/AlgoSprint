@@ -44,7 +44,7 @@ function Homepage() {
   const [problemsPerPage] = useState(12);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('default');
-
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [filters, setFilters] = useState({
     difficulty: 'all',
     tag: 'all',
@@ -129,6 +129,7 @@ function Homepage() {
       </div>
 
       {/* NAVBAR */}
+      {/* NAVBAR */}
       <nav className="bg-[#0c0c0c]/90 backdrop-blur-2xl border-b border-white/10 px-4 md:px-12 h-16 sticky top-0 z-50 flex items-center justify-between shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-10">
           <NavLink to="/" className="flex items-center gap-2 group">
@@ -140,6 +141,7 @@ function Homepage() {
             <span className="text-xl font-black text-white tracking-tighter italic">ALGO<span className="text-orange-500">SPRINT</span></span>
           </NavLink>
 
+          {/* Desktop Links */}
           <div className="hidden lg:flex items-center gap-8 ml-4">
             <NavLink to="/" className={({ isActive }) => `text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:text-white relative group ${isActive ? 'text-orange-500' : 'text-gray-500'}`}>
               Dashboard
@@ -175,7 +177,7 @@ function Homepage() {
                     <span className="text-xs font-black text-orange-500">{user.firstName?.substring(0, 2).toUpperCase()}</span>
                   )}
                 </div>
-                <span className="text-xs font-bold text-gray-300 group-hover:text-white">{user.firstName}</span>
+                <span className="text-xs font-bold text-gray-300 group-hover:text-white hidden sm:inline">{user.firstName}</span>
               </div>
               <ul tabIndex={0} className="mt-3 p-2 shadow-2xl menu dropdown-content bg-[#111] rounded-2xl w-52 border border-white/10 backdrop-blur-xl">
                 {user.role === 'admin' && <li><button onClick={() => navigate('/admin')} className="hover:text-orange-500">Admin Panel</button></li>}
@@ -186,7 +188,37 @@ function Homepage() {
           ) : (
             <button onClick={() => navigate('/login')} className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-orange-500">Sign In</button>
           )}
+
+          {/* Mobile Menu Toggle */}
+          <button 
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="lg:hidden p-2 text-gray-400 hover:text-white transition-colors"
+          >
+            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
         </div>
+
+        {/* Mobile Menu Overlay */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="absolute top-16 left-0 w-full bg-[#0c0c0c] border-b border-white/10 lg:hidden overflow-hidden z-40"
+            >
+              <div className="flex flex-col p-6 gap-6">
+                <NavLink to="/" onClick={() => setIsMenuOpen(false)} className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-orange-500">Dashboard</NavLink>
+                <NavLink to="/problems" onClick={() => setIsMenuOpen(false)} className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-orange-500">Problem</NavLink>
+                <NavLink to="/contests" onClick={() => setIsMenuOpen(false)} className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-orange-500">Contests</NavLink>
+                <NavLink to="/leaderboard" onClick={() => setIsMenuOpen(false)} className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-orange-500">Leaderboard</NavLink>
+                <button className="sm:hidden w-full py-3 rounded-xl bg-orange-500 text-black text-[10px] font-black uppercase tracking-widest">
+                  <Zap size={12} className="inline mr-1" /> Get Premium
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       {/* Main Content */}
