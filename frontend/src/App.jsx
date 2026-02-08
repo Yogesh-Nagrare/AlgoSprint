@@ -41,7 +41,7 @@ function App(){
     dispatch(checkAuth());
   }, [dispatch]);
   const isVerifyPage = window.location.pathname.startsWith("/verify-email");
-  if (loading && !isVerifyPage) {
+  if (true) {
     return <LoadingScreen />;
   }
 
