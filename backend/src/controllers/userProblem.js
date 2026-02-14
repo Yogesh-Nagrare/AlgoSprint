@@ -11,7 +11,6 @@ const { wrapCode } = require("../utils/CodeWrapper");
 // ... (Keep all your existing functions: createProblem, updateProblem, deleteProblem, etc.)
 
 const createProblem = async (req, res) => {
-    // ... your existing createProblem code stays the same
     const { 
         title, 
         description, 
@@ -25,6 +24,14 @@ const createProblem = async (req, res) => {
     } = req.body;
 
     try {
+        console.log('\n🔍 ===== PROBLEM CREATION DEBUG =====');
+        console.log('Title:', title);
+        console.log('Difficulty:', difficulty);
+        console.log('Visible Test Cases:', visibleTestCases?.length);
+        console.log('Hidden Test Cases:', hiddenTestCases?.length);
+        console.log('Reference Solutions:', referenceSolution?.length);
+        console.log('Function Signatures:', functionSignature?.length);
+
         // Validate each reference solution
         for (const { language, completeCode } of referenceSolution) {
             const languageId = getLanguageById(language);
@@ -40,9 +47,15 @@ const createProblem = async (req, res) => {
                 });
             }
 
-            console.log(`\n=== Testing ${language} Reference Solution ===`);
-            console.log("Original Code:", completeCode);
-            console.log("Function Signature:", functionSig.signature);
+            console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            console.log(`🧪 TESTING ${language.toUpperCase()} REFERENCE SOLUTION`);
+            console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            
+            console.log('\n📝 Original Code:');
+            console.log(completeCode);
+            
+            console.log('\n🔧 Function Signature:');
+            console.log(functionSig.signature);
 
             let wrappedCode;
             try {
@@ -53,22 +66,27 @@ const createProblem = async (req, res) => {
                     'auto',
                     'auto'
                 );
-                console.log("Wrapped Code:", wrappedCode);
+                console.log('\n✅ Wrapped Code (first 500 chars):');
+                console.log(wrappedCode.substring(0, 500) + '...');
             } catch (wrapError) {
-                console.error("Code Wrapping Error:", wrapError);
+                console.error('\n❌ CODE WRAPPING ERROR:', wrapError);
                 return res.status(400).json({
                     success: false,
                     message: `Failed to wrap code for ${language}`,
-                    details: wrapError.message
+                    details: wrapError.message,
+                    stack: wrapError.stack
                 });
             }
 
-            const submissions = visibleTestCases.map((testcase) => {
+            console.log('\n📊 Testing Against Visible Test Cases:');
+            
+            const submissions = visibleTestCases.map((testcase, index) => {
                 const processedInput = preprocessInput(testcase.input);
                 
-                console.log(`\nTest Case Input:`, testcase.input);
-                console.log(`Processed Input:`, processedInput);
-                console.log(`Expected Output:`, testcase.output);
+                console.log(`\n  Test Case ${index + 1}:`);
+                console.log(`    Raw Input:       "${testcase.input}"`);
+                console.log(`    Processed Input: "${processedInput}"`);
+                console.log(`    Expected Output: "${testcase.output}"`);
                 
                 return {
                     source_code: wrappedCode,
@@ -77,9 +95,11 @@ const createProblem = async (req, res) => {
                 };
             });
 
+            console.log('\n⏳ Submitting to Judge0...');
             const submitResult = await submitBatch(submissions);
             
             if (!submitResult || submitResult.length === 0) {
+                console.error('❌ Judge0 submission failed - no result returned');
                 return res.status(500).json({
                     success: false,
                     message: "Judge0 submission failed"
@@ -87,59 +107,94 @@ const createProblem = async (req, res) => {
             }
             
             const resultToken = submitResult.map((value) => value.token);
-            console.log(`Submission tokens:`, resultToken);
+            console.log(`✅ Submission tokens:`, resultToken);
             
+            console.log('⏳ Waiting for results...');
             const testResult = await submitToken(resultToken);
             
-            console.log(`${language} Results:`, JSON.stringify(testResult, null, 2));
+            console.log(`\n📊 ${language} EXECUTION RESULTS:`);
 
             for (let i = 0; i < testResult.length; i++) {
                 const test = testResult[i];
                 const expectedOutput = visibleTestCases[i].output;
                 
+                console.log(`\n  ━━━ Test Case ${i + 1} ━━━`);
+                console.log(`  Status ID:        ${test.status_id}`);
+                console.log(`  Status:           ${test.status?.description || 'N/A'}`);
+                console.log(`  Stdout:           "${test.stdout || ''}"`);
+                console.log(`  Stderr:           "${test.stderr || ''}"`);
+                console.log(`  Expected Output:  "${expectedOutput}"`);
+                console.log(`  Execution Time:   ${test.time || 'N/A'}s`);
+                console.log(`  Memory:           ${test.memory || 'N/A'} KB`);
+                
+                // Compilation Error
                 if (test.status_id === 6) {
+                    console.error(`\n  ❌ COMPILATION ERROR`);
+                    console.error(`  Details:`, test.compile_output || test.stderr);
                     return res.status(400).json({
                         success: false,
                         message: `Compilation Error for ${language}`,
                         details: test.compile_output || test.stderr || "Compilation failed",
                         stderr: test.compile_output || test.stderr || "",
-                        wrappedCode: wrappedCode
+                        wrappedCode: wrappedCode,
+                        testCaseIndex: i + 1,
+                        input: visibleTestCases[i].input
                     });
                 }
                 
+                // Runtime Error
                 if (test.status_id === 5 || test.status_id === 11 || test.status_id === 12) {
+                    console.error(`\n  ❌ RUNTIME ERROR`);
+                    console.error(`  Details:`, test.stderr || test.status?.description);
                     return res.status(400).json({
                         success: false,
                         message: `Runtime Error for ${language}`,
                         details: test.status?.description || "Runtime Error",
                         stderr: test.stderr || "",
-                        wrappedCode: wrappedCode
+                        wrappedCode: wrappedCode,
+                        testCaseIndex: i + 1,
+                        input: visibleTestCases[i].input
                     });
                 }
                 
+                // Compare outputs
                 const comparison = compareOutputs(test.stdout, expectedOutput);
                 
-                console.log(`\n📊 Test ${i + 1} Comparison:`);
-                console.log("  Raw Actual:       ", JSON.stringify(test.stdout));
-                console.log("  Raw Expected:     ", JSON.stringify(expectedOutput));
-                console.log("  Formatted Actual: ", comparison.formattedActual);
-                console.log("  Formatted Expected:", comparison.formattedExpected);
-                console.log("  Match:            ", comparison.match ? "✅" : "❌");
+                console.log(`  ━━━ Output Comparison ━━━`);
+                console.log(`  Raw Stdout:          "${test.stdout}"`);
+                console.log(`  Raw Expected:        "${expectedOutput}"`);
+                console.log(`  Formatted Stdout:    "${comparison.formattedActual}"`);
+                console.log(`  Formatted Expected:  "${comparison.formattedExpected}"`);
+                console.log(`  Normalized Stdout:   "${comparison.normalizedActual}"`);
+                console.log(`  Normalized Expected: "${comparison.normalizedExpected}"`);
+                console.log(`  Match:               ${comparison.match ? "✅ PASS" : "❌ FAIL"}`);
                 
                 if (!comparison.match) {
+                    console.error(`\n  ❌ OUTPUT MISMATCH`);
                     return res.status(400).json({
                         success: false,
                         message: `Output mismatch for ${language}`,
                         details: "Wrong Answer",
+                        testCaseIndex: i + 1,
+                        input: visibleTestCases[i].input,
                         stdout: test.stdout || "",
                         expectedOutput: expectedOutput,
                         formattedActual: comparison.formattedActual,
                         formattedExpected: comparison.formattedExpected,
+                        normalizedActual: comparison.normalizedActual,
+                        normalizedExpected: comparison.normalizedExpected,
                         wrappedCode: wrappedCode
                     });
                 }
+                
+                console.log(`  ✅ Test Case ${i + 1} PASSED`);
             }
+            
+            console.log(`\n✅ All test cases passed for ${language}!`);
         }
+
+        console.log('\n🎉 All reference solutions validated successfully!');
+        console.log('💾 Creating problem in database...');
 
         const newProblem = await Problem.create({
             title,
@@ -154,6 +209,8 @@ const createProblem = async (req, res) => {
             problemCreator: req.result._id,
         });
 
+        console.log('✅ Problem created with ID:', newProblem._id);
+
         res.status(201).json({
             success: true,
             message: "Problem created successfully",
@@ -161,9 +218,14 @@ const createProblem = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Create Problem Error:", error);
-        console.error("Error Response:", error.response?.data);
-        console.error("Error Status:", error.response?.status);
+        console.error('\n❌ CREATE PROBLEM ERROR:');
+        console.error('Message:', error.message);
+        console.error('Stack:', error.stack);
+        
+        if (error.response) {
+            console.error('Response Status:', error.response.status);
+            console.error('Response Data:', error.response.data);
+        }
 
         if (error.response && error.response.status === 429) {
             return res.status(429).json({
@@ -192,34 +254,116 @@ const createProblem = async (req, res) => {
     }
 }
 
+
 const updateProblem = async (req, res) => {
-    // ... your existing updateProblem code
     const { id } = req.params;
-    const { title, description, difficulty, tags, visibleTestCases, hiddenTestCases, startCode, referenceSolution } = req.body;
+    const { 
+        title, 
+        description, 
+        difficulty, 
+        tags, 
+        visibleTestCases, 
+        hiddenTestCases, 
+        startCode, 
+        referenceSolution,
+        functionSignature  // ⚠️ MISSING in your code!
+    } = req.body;
 
     try {
+        console.log('\n🔄 ===== PROBLEM UPDATE DEBUG =====');
+        console.log('Problem ID:', id);
+        console.log('Title:', title);
+        console.log('Difficulty:', difficulty);
+        console.log('Visible Test Cases:', visibleTestCases?.length);
+        console.log('Hidden Test Cases:', hiddenTestCases?.length);
+        console.log('Reference Solutions:', referenceSolution?.length);
+        console.log('Function Signatures:', functionSignature?.length);
+
         if (!id) {
-            return res.status(400).json({ success: false, message: "Missing ID field" });
+            return res.status(400).json({ 
+                success: false, 
+                message: "Missing ID field" 
+            });
         }
 
         const existingProblem = await Problem.findById(id);
         if (!existingProblem) {
-            return res.status(404).json({ success: false, message: "Problem not found" });
+            return res.status(404).json({ 
+                success: false, 
+                message: "Problem not found" 
+            });
         }
 
+        // ⚠️ CRITICAL: Validate each reference solution (same as createProblem)
         for (const { language, completeCode } of referenceSolution) {
             const languageId = getLanguageById(language);
 
-            const submissions = visibleTestCases.map((testcase) => ({
-                source_code: completeCode,
-                language_id: languageId,
-                stdin: preprocessInput(testcase.input),
-                expected_output: convertExpectedOutputForJudge0(testcase.output),
-            }));
+            // ⚠️ MISSING: Function signature lookup!
+            const functionSig = functionSignature?.find(
+                sig => sig.language.toLowerCase() === language.toLowerCase()
+            );
+            
+            if (!functionSig) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Function signature missing for ${language}`
+                });
+            }
 
+            console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            console.log(`🧪 TESTING ${language.toUpperCase()} REFERENCE SOLUTION`);
+            console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            
+            console.log('\n📝 Original Code:');
+            console.log(completeCode);
+            
+            console.log('\n🔧 Function Signature:');
+            console.log(functionSig.signature);
+
+            // ⚠️ MISSING: Code wrapping!
+            let wrappedCode;
+            try {
+                wrappedCode = wrapCode(
+                    completeCode,
+                    language,
+                    functionSig.signature,
+                    'auto',
+                    'auto'
+                );
+                console.log('\n✅ Wrapped Code (first 500 chars):');
+                console.log(wrappedCode.substring(0, 500) + '...');
+            } catch (wrapError) {
+                console.error('\n❌ CODE WRAPPING ERROR:', wrapError);
+                return res.status(400).json({
+                    success: false,
+                    message: `Failed to wrap code for ${language}`,
+                    details: wrapError.message,
+                    stack: wrapError.stack
+                });
+            }
+
+            console.log('\n📊 Testing Against Visible Test Cases:');
+            
+            const submissions = visibleTestCases.map((testcase, index) => {
+                const processedInput = preprocessInput(testcase.input);
+                
+                console.log(`\n  Test Case ${index + 1}:`);
+                console.log(`    Raw Input:       "${testcase.input}"`);
+                console.log(`    Processed Input: "${processedInput}"`);
+                console.log(`    Expected Output: "${testcase.output}"`);
+                
+                return {
+                    source_code: wrappedCode,  // ⚠️ Use wrapped code!
+                    language_id: languageId,
+                    stdin: processedInput,
+                };
+            });
+
+            console.log('\n⏳ Submitting to Judge0...');
             const submitResult = await submitBatch(submissions);
 
             if (!submitResult || submitResult.length === 0) {
+                console.error('❌ Judge0 submission failed - no result returned');
                 return res.status(500).json({
                     success: false,
                     message: "Judge0 submission failed"
@@ -227,50 +371,96 @@ const updateProblem = async (req, res) => {
             }
 
             const resultToken = submitResult.map((value) => value.token);
+            console.log(`✅ Submission tokens:`, resultToken);
+            
+            console.log('⏳ Waiting for results...');
             const testResult = await submitToken(resultToken);
+            
+            console.log(`\n📊 ${language} EXECUTION RESULTS:`);
 
             for (let i = 0; i < testResult.length; i++) {
                 const test = testResult[i];
                 const expectedOutput = visibleTestCases[i].output;
                 
+                console.log(`\n  ━━━ Test Case ${i + 1} ━━━`);
+                console.log(`  Status ID:        ${test.status_id}`);
+                console.log(`  Status:           ${test.status?.description || 'N/A'}`);
+                console.log(`  Stdout:           "${test.stdout || ''}"`);
+                console.log(`  Stderr:           "${test.stderr || ''}"`);
+                console.log(`  Expected Output:  "${expectedOutput}"`);
+                console.log(`  Execution Time:   ${test.time || 'N/A'}s`);
+                console.log(`  Memory:           ${test.memory || 'N/A'} KB`);
+                
+                // Compilation Error
                 if (test.status_id === 6) {
+                    console.error(`\n  ❌ COMPILATION ERROR`);
+                    console.error(`  Details:`, test.compile_output || test.stderr);
                     return res.status(400).json({
                         success: false,
                         message: `Compilation Error for ${language}`,
-                        details: "Compilation failed",
+                        details: test.compile_output || test.stderr || "Compilation failed",
                         stderr: test.compile_output || test.stderr || "",
+                        wrappedCode: wrappedCode,
+                        testCaseIndex: i + 1,
+                        input: visibleTestCases[i].input
                     });
                 }
                 
+                // Runtime Error
                 if (test.status_id === 5 || test.status_id === 11 || test.status_id === 12) {
+                    console.error(`\n  ❌ RUNTIME ERROR`);
+                    console.error(`  Details:`, test.stderr || test.status?.description);
                     return res.status(400).json({
                         success: false,
                         message: `Runtime Error for ${language}`,
                         details: test.status?.description || "Runtime Error",
                         stderr: test.stderr || "",
+                        wrappedCode: wrappedCode,
+                        testCaseIndex: i + 1,
+                        input: visibleTestCases[i].input
                     });
                 }
                 
+                // Compare outputs
                 const comparison = compareOutputs(test.stdout, expectedOutput);
                 
-                console.log(`\n📊 Test ${i + 1} Comparison:`);
-                console.log("  Raw Actual:       ", JSON.stringify(test.stdout));
-                console.log("  Formatted Actual: ", comparison.formattedActual);
-                console.log("  Formatted Expected:", comparison.formattedExpected);
-                console.log("  Match:            ", comparison.match ? "✅" : "❌");
+                console.log(`  ━━━ Output Comparison ━━━`);
+                console.log(`  Raw Stdout:          "${test.stdout}"`);
+                console.log(`  Raw Expected:        "${expectedOutput}"`);
+                console.log(`  Formatted Stdout:    "${comparison.formattedActual}"`);
+                console.log(`  Formatted Expected:  "${comparison.formattedExpected}"`);
+                console.log(`  Normalized Stdout:   "${comparison.normalizedActual}"`);
+                console.log(`  Normalized Expected: "${comparison.normalizedExpected}"`);
+                console.log(`  Match:               ${comparison.match ? "✅ PASS" : "❌ FAIL"}`);
                 
                 if (!comparison.match) {
+                    console.error(`\n  ❌ OUTPUT MISMATCH`);
                     return res.status(400).json({
                         success: false,
                         message: `Output mismatch for ${language}`,
                         details: "Wrong Answer",
+                        testCaseIndex: i + 1,
+                        input: visibleTestCases[i].input,
                         stdout: test.stdout || "",
-                        expectedOutput: expectedOutput
+                        expectedOutput: expectedOutput,
+                        formattedActual: comparison.formattedActual,
+                        formattedExpected: comparison.formattedExpected,
+                        normalizedActual: comparison.normalizedActual,
+                        normalizedExpected: comparison.normalizedExpected,
+                        wrappedCode: wrappedCode
                     });
                 }
+                
+                console.log(`  ✅ Test Case ${i + 1} PASSED`);
             }
+            
+            console.log(`\n✅ All test cases passed for ${language}!`);
         }
 
+        console.log('\n🎉 All reference solutions validated successfully!');
+        console.log('💾 Updating problem in database...');
+
+        // ⚠️ IMPORTANT: Include functionSignature in update!
         const updatedProblem = await Problem.findByIdAndUpdate(
             id,
             {
@@ -281,10 +471,13 @@ const updateProblem = async (req, res) => {
                 visibleTestCases,
                 hiddenTestCases,
                 startCode,
-                referenceSolution
+                referenceSolution,
+                functionSignature  // ⚠️ MISSING in your code!
             },
             { runValidators: true, new: true }
         );
+
+        console.log('✅ Problem updated with ID:', updatedProblem._id);
 
         res.status(200).json({
             success: true,
@@ -293,14 +486,41 @@ const updateProblem = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Update Problem Error:", error);
+        console.error('\n❌ UPDATE PROBLEM ERROR:');
+        console.error('Message:', error.message);
+        console.error('Stack:', error.stack);
+        
+        if (error.response) {
+            console.error('Response Status:', error.response.status);
+            console.error('Response Data:', error.response.data);
+        }
+
+        if (error.response && error.response.status === 429) {
+            return res.status(429).json({
+                success: false,
+                message: "Judge0 rate limit exceeded",
+                details: error.response.data.message
+            });
+        }
+
+        if (error.response && error.response.status === 400) {
+            return res.status(500).json({
+                success: false,
+                message: "Judge0 rejected the code",
+                details: error.response.data?.message || error.message,
+                error: error.message
+            });
+        }
+
         res.status(500).json({
             success: false,
             message: "Internal Server Error",
-            error: error.message
+            error: error.message,
+            details: error.response?.data?.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
-}
+};
 
 const deleteProblem = async(req,res) => {
     const {id} = req.params;

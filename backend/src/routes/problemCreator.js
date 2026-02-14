@@ -23,9 +23,12 @@ const {
     markProblemSolved, 
     unmarkProblemSolved
 } = require("../controllers/sheetController");
+const { generateProblem } = require("../controllers/aiProblemGenerator");
 
 // Problem Routes
 // Create (admin only)
+problemRouter.post("/ai/generate", adminMiddleware, generateProblem);
+
 problemRouter.post("/create", adminMiddleware, createProblem);
 // Update (admin only)
 problemRouter.put("/update/:id", adminMiddleware, updateProblem);
