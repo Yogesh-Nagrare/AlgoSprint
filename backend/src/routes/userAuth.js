@@ -1,6 +1,6 @@
 const express = require('express')
 const authRouter = express.Router();
-const {register,login,logout,adminRegister,deleteProfile,verifyEmail,resendVerification,forgotPassword,resetPassword} = require('../controllers/userAuthent');
+const {register,login,logout,adminRegister,deleteProfile,verifyEmail,resendVerification,forgotPassword,resetPassword,  checkVerificationStatus} = require('../controllers/userAuthent');
 const userMiddleware = require('../middleware/userMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { generateAvatarSignature, updateProfilePic } = require('../controllers/userPic');
@@ -48,7 +48,9 @@ authRouter.get('/check', userMiddleware, (req, res) => {
     });
   });
 //GetProfile
+;
 
+authRouter.post('/check-verification-status', checkVerificationStatus);
 authRouter.get('/avatar-signature', userMiddleware, generateAvatarSignature);
 authRouter.post('/update-avatar', userMiddleware, updateProfilePic);
 // authRouter.get('/getProfile',getProfile);

@@ -538,5 +538,36 @@ const deleteProfile = async(req,res)=>{
         res.status(500).send("Error: "+err);
     }
 };
+// Add this to your auth controller
 
-module.exports = {register, login,logout,adminRegister,deleteProfile,verifyEmail,resendVerification,forgotPassword,resetPassword};
+const checkVerificationStatus = async (req, res) => {
+  try {
+    const { emailId } = req.body;
+
+    if (!emailId) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ emailId });
+
+    if (!user) {
+      return res.status(404).json({ 
+        message: "User not found",
+        isVerified: false 
+      });
+    }
+
+    return res.status(200).json({
+      isVerified: user.isEmailVerified,
+      emailId: user.emailId,
+    });
+  } catch (err) {
+    console.error("❌ Check verification error:", err);
+    return res.status(500).json({ 
+      message: "Something went wrong",
+      isVerified: false 
+    });
+  }
+};
+
+module.exports = {register, login,logout,adminRegister,deleteProfile,verifyEmail,resendVerification,forgotPassword,resetPassword,  checkVerificationStatus};

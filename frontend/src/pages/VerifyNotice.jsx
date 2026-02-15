@@ -1,12 +1,106 @@
 import { motion } from 'framer-motion';
-import { Mail, Code, ChevronLeft, ArrowRight, ExternalLink } from 'lucide-react';
-import { NavLink } from 'react-router';
+import { Mail, Code, ChevronLeft, Clock, CheckCircle2, Loader2 } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router';
+import { useState, useEffect, useRef } from 'react';
 
 const VerifyNotice = () => {
+  const navigate = useNavigate();
+  const [isChecking, setIsChecking] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const pollIntervalRef = useRef(null);
+  const checkCountRef = useRef(0);
+
+  // Get user email from localStorage (set during registration)
+  const userEmail = localStorage.getItem('pendingVerificationEmail');
+
+  useEffect(() => {
+    if (!userEmail) {
+      // No email stored, redirect to signup
+      navigate('/signup');
+      return;
+    }
+
+    // Start polling for verification status
+    const checkVerificationStatus = async () => {
+      if (checkCountRef.current >= 60) {
+        // Stop after 60 checks (30 minutes with 30s interval)
+        clearInterval(pollIntervalRef.current);
+        setIsChecking(false);
+        return;
+      }
+
+      try {
+        setIsChecking(true);
+        checkCountRef.current++;
+
+        const response = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/user/check-verification-status`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ emailId: userEmail }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.isVerified) {
+          setIsVerified(true);
+          clearInterval(pollIntervalRef.current);
+          localStorage.removeItem('pendingVerificationEmail');
+          
+          // Show success message briefly then redirect
+          setTimeout(() => {
+            navigate('/login', { 
+              state: { message: 'Account verified! You can now login.' } 
+            });
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('Verification check failed:', error);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    // Initial check
+    checkVerificationStatus();
+
+    // Then check every 30 seconds
+    pollIntervalRef.current = setInterval(checkVerificationStatus, 30000);
+
+    // Cleanup on unmount
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, [userEmail, navigate]);
+
+  if (isVerified) {
+    return (
+      <div className="min-h-screen bg-[#070707] text-gray-200 font-sans flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="bg-emerald-500/20 p-6 rounded-full border border-emerald-500/30 inline-block mb-4">
+            <CheckCircle2 className="text-emerald-500" size={64} />
+          </div>
+          <h2 className="text-2xl font-black text-white mb-2">Verified!</h2>
+          <p className="text-gray-400">Redirecting to login...</p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#070707] text-gray-200 font-sans selection:bg-orange-500/30 flex flex-col items-center justify-center px-4 relative overflow-hidden">
       
-      {/* Background Decor (Matching Landing Page) */}
+      {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/4 -left-20 w-96 h-96 bg-orange-500/10 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-pulse" style={{animationDelay: '1s'}}></div>
@@ -33,6 +127,13 @@ const VerifyNotice = () => {
           {/* Decorative Top Bar */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent opacity-50"></div>
 
+          {/* Checking Status Indicator */}
+          {isChecking && (
+            <div className="absolute top-4 right-4">
+              <Loader2 className="animate-spin text-orange-500" size={20} />
+            </div>
+          )}
+
           {/* Icon Section */}
           <div className="flex justify-center mb-10">
             <motion.div 
@@ -42,46 +143,85 @@ const VerifyNotice = () => {
             >
               <div className="absolute inset-0 bg-orange-500/30 blur-3xl rounded-full"></div>
               <div className="bg-black border border-orange-500/20 p-6 rounded-[24px] relative z-10">
-                <Mail className="text-orange-500" size={48} strokeWidth={1.5} />
+                <Clock className="text-orange-500" size={48} strokeWidth={1.5} />
               </div>
             </motion.div>
           </div>
 
           {/* Text Content */}
           <h2 className="text-3xl font-black text-white tracking-tighter italic uppercase mb-4">
-            Verify Your <span className="text-orange-500">Identity.</span>
+            Registration <span className="text-orange-500">Received.</span>
           </h2>
           
-          <p className="text-gray-400 text-sm font-medium leading-relaxed mb-10">
-            We've dispatched a secure verification link to your inbox. 
-            Click the link to activate your <span className="text-white font-bold">AlgoSprint</span> account and begin your journey.
+          <p className="text-gray-400 text-sm font-medium leading-relaxed mb-6">
+            Your account has been created successfully! We're currently in <span className="text-orange-500 font-bold">beta mode</span> and manually verifying each account to ensure quality.
+          </p>
+
+          {/* Timeline */}
+          <div className="bg-black/40 border border-white/5 rounded-2xl p-6 mb-8">
+            <div className="space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="bg-emerald-500/20 p-2 rounded-lg border border-emerald-500/30 mt-1">
+                  <CheckCircle2 className="text-emerald-500" size={16} />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-white font-bold text-xs uppercase tracking-wider">Account Created</p>
+                  <p className="text-gray-500 text-[10px] mt-1">Your registration is complete</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-4">
+                <div className="bg-orange-500/20 p-2 rounded-lg border border-orange-500/30 mt-1 animate-pulse">
+                  <Clock className="text-orange-500" size={16} />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-white font-bold text-xs uppercase tracking-wider">Pending Verification</p>
+                  <p className="text-gray-500 text-[10px] mt-1">Usually takes 1-24 hours</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-4 opacity-40">
+                <div className="bg-white/5 p-2 rounded-lg border border-white/10 mt-1">
+                  <Mail className="text-gray-600" size={16} />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-gray-600 font-bold text-xs uppercase tracking-wider">Auto-Redirect</p>
+                  <p className="text-gray-700 text-[10px] mt-1">You'll be redirected automatically</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-gray-500 text-xs mb-8 leading-relaxed">
+            Once verified, this page will automatically redirect you to login. 
+            No need to refresh! 🚀
           </p>
 
           {/* Actions */}
           <div className="space-y-4">
-            <button 
-              onClick={() => window.open('https://mail.google.com', '_blank')}
-              className="group w-full flex items-center justify-center gap-3 rounded-2xl bg-white text-black py-4 font-black text-xs uppercase tracking-[0.2em] hover:bg-orange-500 transition-all"
-            >
-              Open Mail Inbox <ExternalLink size={16} />
-            </button>
-
             <NavLink 
               to="/login"
+              className="group w-full flex items-center justify-center gap-2 rounded-2xl bg-orange-500 py-4 text-black font-black text-xs uppercase tracking-[0.2em] hover:bg-orange-600 transition-all"
+            >
+              Go to Login
+            </NavLink>
+
+            <NavLink 
+              to="/"
               className="group w-full flex items-center justify-center gap-2 rounded-2xl bg-white/5 border border-white/10 py-4 text-white font-black text-xs uppercase tracking-[0.2em] hover:bg-white/10 transition-all"
             >
-              Go to Login <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              Back to Home
             </NavLink>
           </div>
 
           {/* Bottom Help */}
           <div className="mt-10 pt-8 border-t border-white/5">
              <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">
-               Didn't receive the email?
+               Questions about verification?
              </p>
-             <button className="mt-2 text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] hover:text-orange-400 transition-colors">
-               Resend Verification Link
-             </button>
+             <p className="mt-2 text-[10px] font-medium text-gray-500">
+               Contact us at <span className="text-orange-500">support@algosprint.com</span>
+             </p>
           </div>
         </div>
 

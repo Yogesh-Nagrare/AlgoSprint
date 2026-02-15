@@ -357,7 +357,7 @@ function LandingPage() {
           <div className="border-t border-white/5 pt-12 flex flex-col md:flex-row justify-between items-center gap-6">
             <p className="text-gray-600 text-[10px] font-black uppercase tracking-[0.3em]">© 2024 ALGO SPRINT INC.</p>
             <div className="flex items-center gap-2 text-gray-600 text-[10px] font-black uppercase tracking-[0.3em]">
-              Made with <Heart size={12} className="text-orange-500 fill-orange-500" /> by Engineers
+              Made with <Heart size={12} className="text-orange-500 fill-orange-500" /> by Yogesh
             </div>
           </div>
         </div>
