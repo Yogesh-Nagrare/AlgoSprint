@@ -30,8 +30,10 @@ import {
     Check,
     Timer as TimerIcon,
     Pause, // Added Pause Icon
-    AlertCircle // <--- ADD THIS
-
+    AlertCircle, // <--- ADD THIS
+    AlertTriangle, // Add this for the warning banner
+    Rocket,
+    X
 } from 'lucide-react';
 
 const langMap = {
@@ -48,7 +50,8 @@ const ProblemPage = () => {
     const editorState = useSelector((state) => state.editor) || {};
     const userCode = editorState.userCode || {};
     const lastSelectedLanguage = editorState.lastSelectedLanguage || {};
-    
+    const [notification, setNotification] = useState(null); // { message, detail, type }
+
     // --- RESIZING LOGIC START ---
     const [leftWidth, setLeftWidth] = useState(50);
     const isResizing = useRef(false);
@@ -264,6 +267,29 @@ const ProblemPage = () => {
     };
 
     const handleEditorDidMount = (editor) => { editorRef.current = editor; };
+    const showNotice = (msg, detail) => {
+        setNotification({ msg, detail });
+        // Auto-hide after 10 seconds
+        setTimeout(() => setNotification(null), 10000);
+    };
+
+    // Add these states at the top of your component
+    const [quota, setQuota] = useState({ runsLeft: 1, submitsLeft: 1 });
+
+    // Add this function to fetch quota
+    const fetchQuota = async () => {
+        try {
+            const response = await axiosClient.get(`/submission/quota/${problemId}`);
+            setQuota(response.data);
+        } catch (error) {
+            console.error('Failed to fetch quota:', error);
+        }
+    };
+
+    // Call fetchQuota when component mounts and after each run/submit
+    useEffect(() => {
+        fetchQuota();
+    }, [problemId]);
 
     const handleRun = async () => {
         setLoading(true);
@@ -271,14 +297,22 @@ const ProblemPage = () => {
         setSelectedTestCaseIndex(0);
         setIsConsoleOpen(true); 
         setActiveRightTab('testcase'); 
-        try {
-            const response = await axiosClient.post(`/submission/run/${problemId}`, { code, language: selectedLanguage });
-            setRunResult(response.data);
-            setLoading(false);
-        } catch (error) {
+       try {
+        const response = await axiosClient.post(`/submission/run/${problemId}`, { code, language: selectedLanguage });
+        setRunResult(response.data);
+            setQuota(prev => ({ ...prev, runsLeft: 0 })); // Ensure it shows 0 if blocked
+
+    } catch (error) {
+        if (error.response?.status === 429) {
+            // Show custom alert for rate limit
+            setQuota(prev => ({ ...prev, runsLeft: 0 })); // Ensure it shows 0 if blocked
+            showNotice("Daily Run Limit Reached", error.response.data.detail);
+        } else {
             setRunResult({ success: false, error: 'Internal server error' });
-            setLoading(false);
         }
+    } finally {
+        setLoading(false);
+    }
     };
 
     const handleSubmitCode = async () => {
@@ -287,13 +321,16 @@ const ProblemPage = () => {
         setIsConsoleOpen(true); 
         setActiveRightTab('result'); 
         try {
-            const response = await axiosClient.post(`/submission/submit/${problemId}`, { code, language: selectedLanguage });
-            setSubmitResult(response.data);
-            if (response.data.problemStatus) {
-            setProblemStatus(response.data.problemStatus);
-        }
-            setLoading(false);
+        const response = await axiosClient.post(`/submission/submit/${problemId}`, { code, language: selectedLanguage });
+        setSubmitResult(response.data);
+        setQuota(prev => ({ ...prev, submitsLeft: 0 }));
+        if (response.data.problemStatus) setProblemStatus(response.data.problemStatus);
         } catch (error) {
+        if (error.response?.status === 429) {
+            setQuota(prev => ({ ...prev, submitsLeft: 0 }));
+            showNotice("Daily Submission Limit Reached", error.response.data.detail);
+        }
+        } finally {
             setLoading(false);
         }
     };
@@ -394,7 +431,126 @@ const ProblemPage = () => {
                     </div>
                 </div>
             </div>
+            {/* REFINED WARNING BANNER */}
+            <div className="relative overflow-hidden px-6 py-2 bg-[#1a1610] border-b border-amber-500/20 flex items-center justify-between shrink-0 group">
+                
+                {/* Background Shine */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-500/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out"></div>
 
+                <div className="flex items-center gap-4 relative z-10">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                        <AlertCircle size={16} className="text-amber-500 animate-pulse" />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em]">
+                                Daily Quota
+                            </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] text-gray-400 font-medium">Run:</span>
+                                <span className={`text-[12px] font-bold px-2 py-0.5 rounded border transition-all ${
+                                    quota.runsLeft > 0 
+                                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                                        : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                                }`}>
+                                    {quota.runsLeft}
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] text-gray-400 font-medium">Submit:</span>
+                                <span className={`text-[12px] font-bold px-2 py-0.5 rounded border transition-all ${
+                                    quota.submitsLeft > 0 
+                                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                                        : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                                }`}>
+                                    {quota.submitsLeft}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* --- BLINKING CAUTIONARY MESSAGE --- */}
+                        <div className="hidden lg:flex items-center gap-2 ml-2 pl-4 border-l border-white/10">
+                            {/* Blinking Dot */}
+                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]"></div>
+                            
+                            <p className="text-[11px] font-bold italic tracking-tight animate-caution-blink">
+                                <span className="text-amber-500 uppercase mr-1.5">Caution:</span>
+                                <span className="text-amber-200/80">
+                                    Limited attempts available. Verify your logic thoroughly before execution!
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Premium Button */}
+                <button className="relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500 transition-all duration-300 group/btn">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 group-hover/btn:text-black">
+                        Get Unlimited Access
+                    </span>
+                    <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center group-hover/btn:bg-black/20">
+                        <ChevronDown size={10} className="-rotate-90 text-amber-500 group-hover/btn:text-black" />
+                    </div>
+                </button>
+            </div>
+
+            {/* ADD THIS CSS TO YOUR STYLE TAG OR GLOBAL CSS */}
+            <style jsx="true">{`
+                @keyframes caution-blink {
+                    0%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(245, 158, 11, 0.6); }
+                    50% { opacity: 0.4; text-shadow: none; }
+                }
+                .animate-caution-blink {
+                    animation: caution-blink 2s infinite ease-in-out;
+                }
+            `}</style>
+            {/* 1. BEAUTIFUL FLOATING NOTIFICATION */}
+            {/* --- CENTERED NOTIFICATION MODAL --- */}
+            {notification && (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+                    {/* Backdrop / Blur */}
+                    <div 
+                        className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in duration-300" 
+                        onClick={() => setNotification(null)} // Close on click outside
+                    />
+                    
+                    {/* Modal Content */}
+                    <div className="relative bg-[#1a1a1a] border border-orange-500/30 rounded-2xl shadow-[0_0_50px_rgba(249,115,22,0.15)] p-8 max-w-sm w-full text-center animate-in zoom-in-95 duration-300">
+                        <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Rocket className="text-orange-500" size={40} />
+                        </div>
+                        
+                        <h3 className="text-xl font-bold text-white mb-2">{notification.msg}</h3>
+                        <p className="text-gray-400 text-sm leading-relaxed mb-8">
+                            {notification.detail}
+                        </p>
+                        
+                        <div className="flex flex-col gap-3">
+                            <button className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-all shadow-lg active:scale-95">
+                                Upgrade to Premium
+                            </button>
+                            <button 
+                                onClick={() => setNotification(null)}
+                                className="w-full py-3 bg-white/5 hover:bg-white/10 text-gray-400 font-medium rounded-xl transition-all"
+                            >
+                                Maybe Later
+                            </button>
+                        </div>
+
+                        <button 
+                            onClick={() => setNotification(null)}
+                            className="absolute top-4 right-4 text-gray-500 hover:text-white"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+                </div>
+            )}
             <div className="flex-1 flex p-3 overflow-hidden gap-0">
                 {/* LEFT PANEL */}
                 <div 
@@ -424,6 +580,7 @@ const ProblemPage = () => {
                             </button>
                         ))}
                     </div>
+
 
                     <div className="flex-1 overflow-y-auto p-6 custom-scrollbar scroll-smooth">
                         {problem && (
@@ -864,11 +1021,11 @@ const ProblemPage = () => {
                             </button>
                         </div>
                         <div className="flex gap-3">
-                            <button onClick={handleRun} disabled={loading} className="flex items-center gap-2 px-6 py-2 bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white text-sm font-semibold rounded-lg transition-all disabled:opacity-50 active:scale-95">
+                            <button onClick={handleRun} disabled={loading|| quota.runsLeft === 0} className="flex items-center gap-2 px-6 py-2 bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white text-sm font-semibold rounded-lg transition-all disabled:opacity-50 active:scale-95">
                                 <Play size={14} fill="currentColor" />
                                 {loading ? 'Running...' : 'Run'}
                             </button>
-                            <button onClick={handleSubmitCode} disabled={loading} className="flex items-center gap-2 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(249,115,22,0.3)] disabled:opacity-50 active:scale-95">
+                            <button onClick={handleSubmitCode} disabled={loading|| quota.submitsLeft === 0} className="flex items-center gap-2 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(249,115,22,0.3)] disabled:opacity-50 active:scale-95">
                                 <Send size={14} />
                                 {loading ? 'Submitting...' : 'Submit'}
                             </button>

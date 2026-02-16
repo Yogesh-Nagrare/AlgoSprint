@@ -4,6 +4,7 @@ const {getLanguageById,submitBatch,submitToken} = require("../utils/ProblemUtili
 const { preprocessInput } = require("../utils/InputParser");
 const { compareOutputs } = require('../utils/OutputNormalizer');
 const { wrapCode } = require('../utils/CodeWrapper');
+const redisClient = require('../config/redis'); // <--- ADD THIS IMPORT
 
 const submitCode = async (req,res)=>{
     try{
@@ -232,8 +233,36 @@ const runCode = async (req,res)=>{
         res.status(500).send("Internal Server Error: " + err.message);
     }
 };
+// controllers/userSubmission.js (add this new function)
+const checkQuota = async (req, res) => {
+    try {
+        const userId = req.result?._id;
+        if (!userId) return res.status(401).send("Unauthorized");
 
-module.exports = {submitCode,runCode};
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Check run count
+        const runKey = `ratelimit:run:${userId}:${today}`;
+        const runCount = await redisClient.get(runKey);
+        const runsLeft = Math.max(0, 1 - (parseInt(runCount) || 0));
+        
+        // Check submit count
+        const submitKey = `ratelimit:submit:${userId}:${today}`;
+        const submitCount = await redisClient.get(submitKey);
+        const submitsLeft = Math.max(0, 1 - (parseInt(submitCount) || 0));
+
+        res.json({
+            runsLeft,
+            submitsLeft,
+            resetAt: new Date(new Date().setUTCHours(24, 0, 0, 0)).toISOString()
+        });
+    } catch (error) {
+        console.error('Check quota error:', error);
+        res.status(500).json({ error: 'Failed to check quota' });
+    }
+};
+
+module.exports = {submitCode,runCode,checkQuota};
 
 //     language_id: 54,
 //     stdin: '2 3',
