@@ -19,6 +19,15 @@ const submitCode = async (req,res)=>{
         language='c++'
 
        const problem = await Problem.findById(problemId);
+        if (req.quotaExhausted) {
+    console.log("🚫 Submit quota exhausted");
+
+    return res.status(429).json({
+        message: "Daily submit limit reached",
+        detail: "You can submit once per day. Upgrade for unlimited access.",
+        isQuotaExceeded: true
+    });
+}
 
        // Get function signature for this language
        const functionSig = problem.functionSignature?.find(
@@ -126,113 +135,244 @@ const submitCode = async (req,res)=>{
     }
 }
 
-const runCode = async (req,res)=>{
-    try{
-       const userId = req.result._id;
-       const problemId = req.params.id;
-       let {code,language} = req.body;
+// const runCode = async (req,res)=>{
+//     try{
+//        const userId = req.result._id;
+//        const problemId = req.params.id;
+//        let {code,language} = req.body;
 
-      if(!userId||!code||!problemId||!language)
-        return res.status(400).send("Some field missing");
+//       if(!userId||!code||!problemId||!language)
+//         return res.status(400).send("Some field missing");
 
-      const problem = await Problem.findById(problemId);
+//       const problem = await Problem.findById(problemId);
+//        // ✨✨✨ CHECK QUOTA - IF EXHAUSTED, REDIRECT TO AI ✨✨✨
+//         const today = new Date().toISOString().split('T')[0];
+//         const runKey = `ratelimit:run:${userId}:${today}`;
+//         const runCount = parseInt(await redisClient.get(runKey) || "0");
+
+//         if (runCount >= 1) {
+//             console.log("🚫 Quota exhausted - Returning AI redirect flag");
+//             return res.status(200).json({
+//                 quotaExhausted: true,
+//                 message: "Daily run limit reached",
+//                 redirectToAI: true
+//             });
+//         }
+//       if(language==='cpp')
+//         language='c++'
+
+//       // Get function signature and wrap code
+//       const functionSig = problem.functionSignature?.find(
+//           sig => sig.language.toLowerCase() === language.toLowerCase()
+//       );
       
-      if(language==='cpp')
-        language='c++'
+//       let wrappedCode = code;
+//       if (functionSig) {
+//           wrappedCode = wrapCode(
+//               code, 
+//               language, 
+//               functionSig.signature,
+//               'auto',
+//               'auto'
+//           );
+//       }
 
-      // Get function signature and wrap code
-      const functionSig = problem.functionSignature?.find(
-          sig => sig.language.toLowerCase() === language.toLowerCase()
-      );
+//       const languageId = getLanguageById(language);
+
+//       const submissions = problem.visibleTestCases.map((testcase)=>({
+//           source_code: wrappedCode,  // Use wrapped code
+//           language_id: languageId,
+//           stdin: preprocessInput(testcase.input)
+//       }));
+
+//       const submitResult = await submitBatch(submissions);
+//       const resultToken = submitResult.map((value)=> value.token);
+//       const testResult = await submitToken(resultToken);
       
-      let wrappedCode = code;
-      if (functionSig) {
-          wrappedCode = wrapCode(
-              code, 
-              language, 
-              functionSig.signature,
-              'auto',
-              'auto'
-          );
-      }
+//       let testCasesPassed = 0;
+//       let runtime = 0;
+//       let memory = 0;
+//       let overallSuccess = true;
 
-      const languageId = getLanguageById(language);
-
-      const submissions = problem.visibleTestCases.map((testcase)=>({
-          source_code: wrappedCode,  // Use wrapped code
-          language_id: languageId,
-          stdin: preprocessInput(testcase.input)
-      }));
-
-      const submitResult = await submitBatch(submissions);
-      const resultToken = submitResult.map((value)=> value.token);
-      const testResult = await submitToken(resultToken);
-      
-      let testCasesPassed = 0;
-      let runtime = 0;
-      let memory = 0;
-      let overallSuccess = true;
-
-      const processedResults = testResult.map((test, i) => {
-          const testcase = problem.visibleTestCases[i];
+//       const processedResults = testResult.map((test, i) => {
+//           const testcase = problem.visibleTestCases[i];
           
-          let testStatus = 'failed';
-          let testError = null;
+//           let testStatus = 'failed';
+//           let testError = null;
           
-          if(test.status_id === 6){
-              testStatus = 'compilation_error';
-              testError = test.compile_output || test.stderr;
-              overallSuccess = false;
-          } else if(test.status_id === 5 || test.status_id === 11 || test.status_id === 12){
-              testStatus = 'runtime_error';
-              testError = test.stderr;
-              overallSuccess = false;
-          } else if(test.status_id !== 3) {
-              testStatus = 'error';
-              testError = test.status?.description || 'Unknown error';
-              overallSuccess = false;
-          } else {
-              const comparison = compareOutputs(test.stdout, testcase.output);
+//           if(test.status_id === 6){
+//               testStatus = 'compilation_error';
+//               testError = test.compile_output || test.stderr;
+//               overallSuccess = false;
+//           } else if(test.status_id === 5 || test.status_id === 11 || test.status_id === 12){
+//               testStatus = 'runtime_error';
+//               testError = test.stderr;
+//               overallSuccess = false;
+//           } else if(test.status_id !== 3) {
+//               testStatus = 'error';
+//               testError = test.status?.description || 'Unknown error';
+//               overallSuccess = false;
+//           } else {
+//               const comparison = compareOutputs(test.stdout, testcase.output);
               
-              if(comparison.match){
-                  testStatus = 'passed';
-                  testCasesPassed++;
-                  runtime = runtime + parseFloat(test.time || 0);
-                  memory = Math.max(memory, test.memory || 0);
-              } else {
-                  testStatus = 'wrong_answer';
-                  testError = 'Output does not match expected';
-                  overallSuccess = false;
-              }
-          }
+//               if(comparison.match){
+//                   testStatus = 'passed';
+//                   testCasesPassed++;
+//                   runtime = runtime + parseFloat(test.time || 0);
+//                   memory = Math.max(memory, test.memory || 0);
+//               } else {
+//                   testStatus = 'wrong_answer';
+//                   testError = 'Output does not match expected';
+//                   overallSuccess = false;
+//               }
+//           }
           
-          return {
-              status_id: test.status_id,
-              stdin: testcase.input,
-              stdout: test.stdout || '',
-              expected_output: testcase.output,
-              time: test.time,
-              memory: test.memory,
-              explanation: testcase.explanation,
-              error: testError,
-              testStatus: testStatus
-          };
-      });
+//           return {
+//               status_id: test.status_id,
+//               stdin: testcase.input,
+//               stdout: test.stdout || '',
+//               expected_output: testcase.output,
+//               time: test.time,
+//               memory: test.memory,
+//               explanation: testcase.explanation,
+//               error: testError,
+//               testStatus: testStatus
+//           };
+//       });
 
-      res.status(201).json({
-          success: overallSuccess,
-          testCases: processedResults,
-          testCasesPassed,
-          totalTestCases: problem.visibleTestCases.length,
-          runtime,
-          memory
-      });  
+//       res.status(201).json({
+//           success: overallSuccess,
+//           mode: 'execution',
+//           testCases: processedResults,
+//           testCasesPassed,
+//           totalTestCases: problem.visibleTestCases.length,
+//           runtime,
+//           memory
+//       });  
+//     }
+//     catch(err){
+//         console.error("Run Code Error:", err);
+//         res.status(500).send("Internal Server Error: " + err.message);
+//     }
+// };
+const runCode = async (req, res) => {
+    try {
+        const userId = req.result._id;
+        const problemId = req.params.id;
+        let { code, language } = req.body;
+
+        if (!userId || !code || !problemId || !language)
+            return res.status(400).send("Some field missing");
+
+        const problem = await Problem.findById(problemId);
+
+        // ✨✨✨ CHECK IF MIDDLEWARE DETECTED QUOTA EXHAUSTION ✨✨✨
+        if (req.quotaExhausted) {
+            console.log("🚫 Quota exhausted (from middleware) - Returning redirect flag");
+            return res.status(200).json({
+                quotaExhausted: true,
+                message: "Daily run limit reached"
+            });
+        }
+
+        // ✨✨✨ NORMAL EXECUTION CONTINUES ✨✨✨
+        if (language === 'cpp')
+            language = 'c++'
+
+        const functionSig = problem.functionSignature?.find(
+            sig => sig.language.toLowerCase() === language.toLowerCase()
+        );
+
+        let wrappedCode = code;
+        if (functionSig) {
+            wrappedCode = wrapCode(
+                code,
+                language,
+                functionSig.signature,
+                'auto',
+                'auto'
+            );
+        }
+
+        const languageId = getLanguageById(language);
+
+        const submissions = problem.visibleTestCases.map((testcase) => ({
+            source_code: wrappedCode,
+            language_id: languageId,
+            stdin: preprocessInput(testcase.input)
+        }));
+
+        const submitResult = await submitBatch(submissions);
+        const resultToken = submitResult.map((value) => value.token);
+        const testResult = await submitToken(resultToken);
+
+        let testCasesPassed = 0;
+        let runtime = 0;
+        let memory = 0;
+        let overallSuccess = true;
+
+        const processedResults = testResult.map((test, i) => {
+            const testcase = problem.visibleTestCases[i];
+
+            let testStatus = 'failed';
+            let testError = null;
+
+            if (test.status_id === 6) {
+                testStatus = 'compilation_error';
+                testError = test.compile_output || test.stderr;
+                overallSuccess = false;
+            } else if (test.status_id === 5 || test.status_id === 11 || test.status_id === 12) {
+                testStatus = 'runtime_error';
+                testError = test.stderr;
+                overallSuccess = false;
+            } else if (test.status_id !== 3) {
+                testStatus = 'error';
+                testError = test.status?.description || 'Unknown error';
+                overallSuccess = false;
+            } else {
+                const comparison = compareOutputs(test.stdout, testcase.output);
+
+                if (comparison.match) {
+                    testStatus = 'passed';
+                    testCasesPassed++;
+                    runtime = runtime + parseFloat(test.time || 0);
+                    memory = Math.max(memory, test.memory || 0);
+                } else {
+                    testStatus = 'wrong_answer';
+                    testError = 'Output does not match expected';
+                    overallSuccess = false;
+                }
+            }
+
+            return {
+                status_id: test.status_id,
+                stdin: testcase.input,
+                stdout: test.stdout || '',
+                expected_output: testcase.output,
+                time: test.time,
+                memory: test.memory,
+                explanation: testcase.explanation,
+                error: testError,
+                testStatus: testStatus
+            };
+        });
+
+        res.status(200).json({
+            success: overallSuccess,
+            mode: 'execution',
+            testCases: processedResults,
+            testCasesPassed,
+            totalTestCases: problem.visibleTestCases.length,
+            runtime,
+            memory
+        });
     }
-    catch(err){
+    catch (err) {
         console.error("Run Code Error:", err);
         res.status(500).send("Internal Server Error: " + err.message);
     }
 };
+
 // controllers/userSubmission.js (add this new function)
 const checkQuota = async (req, res) => {
     try {

@@ -29,13 +29,13 @@ import {
     Filter,
     Check,
     Timer as TimerIcon,
-    Pause, // Added Pause Icon
-    AlertCircle, // <--- ADD THIS
-    AlertTriangle, // Add this for the warning banner
+    Pause,
+    AlertCircle,
+    AlertTriangle,
     Rocket,
     X
 } from 'lucide-react';
-
+import SubmissionResultOverlay from '../components/SubmissionResultOverlay';
 const langMap = {
     cpp: 'C++',
     java: 'Java',
@@ -45,12 +45,16 @@ const langMap = {
 const ProblemPage = () => {
     const dispatch = useDispatch();
     const { problemId } = useParams();
-    const [problemStatus, setProblemStatus] = useState('untouched'); // <--- ADD THIS
+    const [problemStatus, setProblemStatus] = useState('untouched');
     const [copiedId, setCopiedId] = useState(null);
     const editorState = useSelector((state) => state.editor) || {};
     const userCode = editorState.userCode || {};
     const lastSelectedLanguage = editorState.lastSelectedLanguage || {};
-    const [notification, setNotification] = useState(null); // { message, detail, type }
+    const [notification, setNotification] = useState(null);
+    const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false); // <--- ADD THIS
+    const [showSubmitOverlay, setShowSubmitOverlay] = useState(false);
+    // ✨ AI REVIEW STATE (NEW)
+    const [aiReview, setAIReview] = useState(null);
 
     // --- RESIZING LOGIC START ---
     const [leftWidth, setLeftWidth] = useState(50);
@@ -128,8 +132,7 @@ const ProblemPage = () => {
         const runningKey = `leetcode_timer_running_${problemId}`;
         const savedElapsedKey = `leetcode_timer_elapsed_${problemId}`;
 
-        // Initialize state from local storage
-        const isRunning = localStorage.getItem(runningKey) !== 'false'; // Default true
+        const isRunning = localStorage.getItem(runningKey) !== 'false';
         setIsTimerRunning(isRunning);
 
         if (isRunning) {
@@ -165,13 +168,10 @@ const ProblemPage = () => {
         const savedElapsedKey = `leetcode_timer_elapsed_${problemId}`;
 
         if (isTimerRunning) {
-            // PAUSE: Save current elapsed time and stop
             localStorage.setItem(runningKey, 'false');
             localStorage.setItem(savedElapsedKey, elapsedTime.toString());
             setIsTimerRunning(false);
         } else {
-            // RESUME: Calculate new start time so math works (Now - NewStart = SavedElapsed)
-            // NewStart = Now - SavedElapsed
             const newStartTime = Date.now() - (elapsedTime * 1000);
             localStorage.setItem(startKey, newStartTime.toString());
             localStorage.setItem(runningKey, 'true');
@@ -183,7 +183,6 @@ const ProblemPage = () => {
         const startKey = `leetcode_timer_start_${problemId}`;
         const savedElapsedKey = `leetcode_timer_elapsed_${problemId}`;
         
-        // Reset to 0 and keep current running state
         if (isTimerRunning) {
             localStorage.setItem(startKey, Date.now().toString());
         } else {
@@ -232,6 +231,7 @@ const ProblemPage = () => {
             }
         }
     }, [selectedLanguage, problem, problemId]); 
+
     useEffect(() => {
         const fetchStatus = async () => {
             try {
@@ -243,6 +243,7 @@ const ProblemPage = () => {
         };
         fetchStatus();
     }, [problemId]);
+
     const handleResetCode = () => {
         if (!problem) return;
         const defaultInitial = problem.startCode.find(
@@ -267,16 +268,14 @@ const ProblemPage = () => {
     };
 
     const handleEditorDidMount = (editor) => { editorRef.current = editor; };
+
     const showNotice = (msg, detail) => {
         setNotification({ msg, detail });
-        // Auto-hide after 10 seconds
         setTimeout(() => setNotification(null), 10000);
     };
 
-    // Add these states at the top of your component
     const [quota, setQuota] = useState({ runsLeft: 1, submitsLeft: 1 });
 
-    // Add this function to fetch quota
     const fetchQuota = async () => {
         try {
             const response = await axiosClient.get(`/submission/quota/${problemId}`);
@@ -286,55 +285,148 @@ const ProblemPage = () => {
         }
     };
 
-    // Call fetchQuota when component mounts and after each run/submit
     useEffect(() => {
         fetchQuota();
     }, [problemId]);
 
+    // ✨✨✨ MODIFIED handleRun WITH AI FALLBACK ✨✨✨
     const handleRun = async () => {
         setLoading(true);
         setRunResult(null);
+        setAIReview(null); // Clear previous AI review
         setSelectedTestCaseIndex(0);
-        setIsConsoleOpen(true); 
-        setActiveRightTab('testcase'); 
-       try {
-        const response = await axiosClient.post(`/submission/run/${problemId}`, { code, language: selectedLanguage });
-        setRunResult(response.data);
-            setQuota(prev => ({ ...prev, runsLeft: 0 })); // Ensure it shows 0 if blocked
-
-    } catch (error) {
-        if (error.response?.status === 429) {
-            // Show custom alert for rate limit
-            setQuota(prev => ({ ...prev, runsLeft: 0 })); // Ensure it shows 0 if blocked
-            showNotice("Daily Run Limit Reached", error.response.data.detail);
-        } else {
-            setRunResult({ success: false, error: 'Internal server error' });
-        }
-    } finally {
-        setLoading(false);
-    }
-    };
-
-    const handleSubmitCode = async () => {
-        setLoading(true);
-        setSubmitResult(null);
-        setIsConsoleOpen(true); 
-        setActiveRightTab('result'); 
+        setIsConsoleOpen(true);
+        setActiveRightTab('testcase');
+        
         try {
-        const response = await axiosClient.post(`/submission/submit/${problemId}`, { code, language: selectedLanguage });
-        setSubmitResult(response.data);
-        setQuota(prev => ({ ...prev, submitsLeft: 0 }));
-        if (response.data.problemStatus) setProblemStatus(response.data.problemStatus);
+            // Try normal run first
+            const response = await axiosClient.post(`/submission/run/${problemId}`, {
+                code,
+                language: selectedLanguage
+            });
+
+            // ✨ CHECK IF QUOTA EXHAUSTED
+            if (response.data.quotaExhausted) {
+                console.log("🚫 Quota exhausted - Calling AI review");
+
+                // Automatically call AI review endpoint
+                const aiResponse = await axiosClient.post(`/submission/ai-review/${problemId}`, {
+                    code,
+                    language: selectedLanguage
+                });
+
+                // Set AI review and switch to AI tab
+                setAIReview(aiResponse.data.aiReview);
+                setActiveRightTab('ai-review');
+                setQuota(prev => ({ ...prev, runsLeft: 0 }));
+
+                showNotice(
+                    aiResponse.data.message,
+                    aiResponse.data.upgradePrompt
+                );
+            } else {
+                // Normal execution result
+                setRunResult(response.data);
+                await fetchQuota();
+            }
+
         } catch (error) {
-        if (error.response?.status === 429) {
-            setQuota(prev => ({ ...prev, submitsLeft: 0 }));
-            showNotice("Daily Submission Limit Reached", error.response.data.detail);
-        }
+            if (error.response?.status === 429) {
+                setQuota(prev => ({ ...prev, runsLeft: 0 }));
+                showNotice("Daily Run Limit Reached", error.response.data.detail);
+            } else {
+                setRunResult({ success: false, error: 'Internal server error' });
+            }
         } finally {
             setLoading(false);
         }
     };
 
+    // const handleSubmitCode = async () => {
+    //     setLoading(true);
+    //     setSubmitResult(null);
+    //     setIsConsoleOpen(true); 
+    //     setActiveRightTab('result'); 
+    //     try {
+    //         const response = await axiosClient.post(`/submission/submit/${problemId}`, {
+    //             code,
+    //             language: selectedLanguage
+    //         });
+    //         setSubmitResult(response.data);
+    //         setQuota(prev => ({ ...prev, submitsLeft: 0 }));
+    //         if (response.data.problemStatus) setProblemStatus(response.data.problemStatus);
+    //     } catch (error) {
+    //         if (error.response?.status === 429) {
+    //             setQuota(prev => ({ ...prev, submitsLeft: 0 }));
+    //             showNotice("Daily Submission Limit Reached", error.response.data.detail);
+    //         }
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // };
+    // 1. Function to trigger the warning modal
+    const handleInitialSubmitClick = () => {
+        if (quota.submitsLeft > 0) {
+            setIsSubmitModalOpen(true);
+        } else {
+            // If already 0, call directly so the 429/AI logic runs
+            executeFinalSubmit();
+        }
+    };
+
+    // 2. The actual API call logic
+    const executeFinalSubmit = async () => {
+        // setIsSubmitModalOpen(false); // Close the modal
+        // setLoading(true);
+        // setSubmitResult(null);
+        // setAIReview(null);
+        // setIsConsoleOpen(true); 
+        // setActiveRightTab('result'); 
+        // try {
+        //     const response = await axiosClient.post(`/submission/submit/${problemId}`, {
+        //         code,
+        //         language: selectedLanguage
+        //     });
+            
+        //     // Check if backend returned AI analysis fallback
+        //     if (response.data.isAIAnalysis) {
+        //         setAIReview(response.data.aiReview);
+        //         setActiveRightTab('ai-review');
+        //     } else {
+        //         setSubmitResult(response.data);
+        //         if (response.data.problemStatus) setProblemStatus(response.data.problemStatus);
+        //     }
+        //     await fetchQuota();
+            setIsSubmitModalOpen(false);
+    setLoading(true);
+    setSubmitResult(null);
+    setAIReview(null);
+    // We keep the console logic but we will trigger the slide over the left panel
+    try {
+        const response = await axiosClient.post(`/submission/submit/${problemId}`, {
+            code,
+            language: selectedLanguage
+        });
+        
+        if (response.data.isAIAnalysis) {
+            setAIReview(response.data.aiReview);
+            setActiveRightTab('ai-review');
+            setIsConsoleOpen(true);
+        } else {
+            setSubmitResult(response.data);
+            setShowSubmitOverlay(true); // <--- OPEN THE SLIDE OVER
+            if (response.data.problemStatus) setProblemStatus(response.data.problemStatus);
+        }
+        await fetchQuota();
+        } catch (error) {
+            if (error.response?.status === 429) {
+                setQuota(prev => ({ ...prev, submitsLeft: 0 }));
+                showNotice("Daily Submission Limit Reached", error.response.data.detail);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
     const handleCopy = async (text, id) => {
         try {
             await navigator.clipboard.writeText(text);
@@ -344,25 +436,19 @@ const ProblemPage = () => {
             console.error('Failed to copy!', err);
         }
     };
+
     const getStatusBadge = () => {
-    if (problemStatus === 'solved') {
-        return (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
-                <CheckCircle2 size={14} className="text-emerald-400" />
-                <span className="text-xs font-bold text-emerald-400 uppercase">Solved</span>
-            </div>
-        );
-    }
-    // else if (problemStatus === 'attempted') {
-    //     return (
-    //         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30">
-    //             <AlertCircle size={14} className="text-amber-400" />
-    //             <span className="text-xs font-bold text-amber-400 uppercase">Attempted</span>
-    //         </div>
-    //     );
-    // }
-    return null;
-};
+        if (problemStatus === 'solved') {
+            return (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                    <CheckCircle2 size={14} className="text-emerald-400" />
+                    <span className="text-xs font-bold text-emerald-400 uppercase">Solved</span>
+                </div>
+            );
+        }
+        return null;
+    };
+
     const getDifficultyColor = (difficulty) => {
         switch (difficulty?.toLowerCase()) {
             case 'easy': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
@@ -395,9 +481,7 @@ const ProblemPage = () => {
                     <span className="font-semibold text-gray-100 tracking-tight">{problem?.title}</span>
                 </div>
                 
-                {/* --- HEADER RIGHT SECTION --- */}
                 <div className="flex items-center gap-4">
-                    {/* Timer Component */}
                     <div className="flex items-center gap-2 bg-white/5 pl-3 pr-2 py-1.5 rounded-lg border border-white/5 shadow-inner">
                         <TimerIcon size={14} className={isTimerRunning ? "text-orange-500" : "text-gray-500"} />
                         <span className={`text-sm font-mono font-medium min-w-[50px] text-center ${isTimerRunning ? "text-gray-200" : "text-gray-500"}`}>
@@ -406,7 +490,6 @@ const ProblemPage = () => {
                         
                         <div className="w-[1px] h-4 bg-white/10 mx-1"></div>
                         
-                        {/* Play/Pause Button */}
                         <button 
                             onClick={toggleTimer}
                             className="p-1.5 hover:bg-white/10 rounded-md text-gray-400 hover:text-white transition-colors"
@@ -415,7 +498,6 @@ const ProblemPage = () => {
                             {isTimerRunning ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
                         </button>
 
-                        {/* Reset Button */}
                         <button 
                             onClick={handleResetTimer}
                             className="p-1.5 hover:bg-white/10 rounded-md text-gray-400 hover:text-white transition-colors"
@@ -431,10 +513,8 @@ const ProblemPage = () => {
                     </div>
                 </div>
             </div>
-            {/* REFINED WARNING BANNER */}
+
             <div className="relative overflow-hidden px-6 py-2 bg-[#1a1610] border-b border-amber-500/20 flex items-center justify-between shrink-0 group">
-                
-                {/* Background Shine */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-500/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out"></div>
 
                 <div className="flex items-center gap-4 relative z-10">
@@ -473,9 +553,7 @@ const ProblemPage = () => {
                             </div>
                         </div>
 
-                        {/* --- BLINKING CAUTIONARY MESSAGE --- */}
                         <div className="hidden lg:flex items-center gap-2 ml-2 pl-4 border-l border-white/10">
-                            {/* Blinking Dot */}
                             <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]"></div>
                             
                             <p className="text-[11px] font-bold italic tracking-tight animate-caution-blink">
@@ -488,7 +566,6 @@ const ProblemPage = () => {
                     </div>
                 </div>
 
-                {/* Premium Button */}
                 <button className="relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500 transition-all duration-300 group/btn">
                     <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 group-hover/btn:text-black">
                         Get Unlimited Access
@@ -499,7 +576,6 @@ const ProblemPage = () => {
                 </button>
             </div>
 
-            {/* ADD THIS CSS TO YOUR STYLE TAG OR GLOBAL CSS */}
             <style jsx="true">{`
                 @keyframes caution-blink {
                     0%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(245, 158, 11, 0.6); }
@@ -509,17 +585,14 @@ const ProblemPage = () => {
                     animation: caution-blink 2s infinite ease-in-out;
                 }
             `}</style>
-            {/* 1. BEAUTIFUL FLOATING NOTIFICATION */}
-            {/* --- CENTERED NOTIFICATION MODAL --- */}
+
             {notification && (
                 <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-                    {/* Backdrop / Blur */}
                     <div 
                         className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in duration-300" 
-                        onClick={() => setNotification(null)} // Close on click outside
+                        onClick={() => setNotification(null)}
                     />
                     
-                    {/* Modal Content */}
                     <div className="relative bg-[#1a1a1a] border border-orange-500/30 rounded-2xl shadow-[0_0_50px_rgba(249,115,22,0.15)] p-8 max-w-sm w-full text-center animate-in zoom-in-95 duration-300">
                         <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                             <Rocket className="text-orange-500" size={40} />
@@ -551,12 +624,49 @@ const ProblemPage = () => {
                     </div>
                 </div>
             )}
+            {/* --- SUBMIT CONFIRMATION MODAL --- */}
+            {isSubmitModalOpen && (
+                <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setIsSubmitModalOpen(false)} />
+                    <div className="relative bg-[#1a1a1a] border border-orange-500/30 rounded-2xl shadow-[0_0_50px_rgba(249,115,22,0.2)] max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="h-2 w-full bg-gradient-to-r from-orange-600 via-amber-400 to-orange-600 animate-pulse"></div>
+                        <div className="p-8">
+                            <div className="w-16 h-16 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-orange-500/20">
+                                <AlertTriangle className="text-orange-500" size={32} />
+                            </div>
+                            <h3 className="text-2xl font-black text-white text-center mb-2 tracking-tight">Final Submission?</h3>
+                            <p className="text-gray-400 text-center text-sm leading-relaxed mb-6">
+                                You have <span className="text-white font-bold">only 1 attempt</span> daily. Hidden test cases are execution-heavy. Are you sure?
+                            </p>
+                            <div className="bg-white/5 rounded-xl p-4 border border-white/5 mb-8">
+                                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-3">Recommended Steps:</p>
+                                <ul className="space-y-2">
+                                    <li className="flex items-center gap-2 text-xs text-gray-300"><div className="w-1 h-1 rounded-full bg-orange-500"></div>Use <span className="text-orange-400 font-bold">Run</span> to test visible cases.</li>
+                                    <li className="flex items-center gap-2 text-xs text-gray-300"><div className="w-1 h-1 rounded-full bg-orange-500"></div>Verify logic to save your daily chance.</li>
+                                </ul>
+                            </div>
+                            <div className="flex gap-3">
+                                <button onClick={() => setIsSubmitModalOpen(false)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-gray-300 font-bold rounded-xl transition-all border border-white/10">Go Back</button>
+                                <button onClick={executeFinalSubmit} className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-xl transition-all shadow-[0_0_20px_rgba(249,115,22,0.4)] active:scale-95">Submit Now</button>
+                            </div>
+                        </div>
+                        <button onClick={() => setIsSubmitModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={20} /></button>
+                    </div>
+                </div>
+            )}
+
             <div className="flex-1 flex p-3 overflow-hidden gap-0">
                 {/* LEFT PANEL */}
                 <div 
                     style={{ width: `${leftWidth}%` }}
                     className="flex flex-col bg-[#1e1e1e] rounded-xl border border-white/10 overflow-hidden shadow-2xl min-w-[150px]"
                 >
+                    {/* LEFT PANEL */}
+                    <SubmissionResultOverlay 
+                        result={submitResult} 
+                        isVisible={showSubmitOverlay} 
+                        onClose={() => setShowSubmitOverlay(false)} 
+                    />
                     <div className="flex items-center bg-[#252525] border-b border-white/5 px-2 overflow-x-auto whitespace-nowrap custom-scrollbar shrink-0">
                         {[
                             { id: 'description', label: 'Description', icon: <FileText size={14}/> },
@@ -580,14 +690,12 @@ const ProblemPage = () => {
                             </button>
                         ))}
                     </div>
-
-
+                    
                     <div className="flex-1 overflow-y-auto p-6 custom-scrollbar scroll-smooth">
                         {problem && (
                             <div className="max-w-3xl mx-auto h-full">
                                 {activeLeftTab === 'description' && (
                                     <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                                        {/* Title row with Status Badge on the far right */}
                                         <div className="flex items-center justify-between mb-4">
                                             <h1 className="text-3xl font-bold text-white tracking-tight">
                                                 {problem.title}
@@ -595,7 +703,6 @@ const ProblemPage = () => {
                                             <div>{getStatusBadge()}</div>
                                         </div>
 
-                                        {/* Metadata row (Difficulty and Submissions) */}
                                         <div className="flex items-center gap-3 mb-8">
                                             <span className={`px-4 py-1 rounded-full text-xs font-bold border ${getDifficultyColor(problem.difficulty)}`}>
                                                 {problem.difficulty}
@@ -604,11 +711,13 @@ const ProblemPage = () => {
                                                 <History size={12} /> 1.2k Submissions
                                             </span>
                                         </div>
+
                                         <div className="text-gray-300 leading-relaxed text-[16px] space-y-6 mb-12 font-normal">
                                             {problem.description.split('\n').map((para, i) => (
                                                 <p key={i}>{para}</p>
                                             ))}
                                         </div>
+
                                         <div className="space-y-10">
                                             {problem.visibleTestCases.map((example, index) => (
                                                 <div key={index} className="group">
@@ -630,18 +739,14 @@ const ProblemPage = () => {
                                 {activeLeftTab === 'submissions' && <SubmissionHistory problemId={problemId} />}
                                 {activeLeftTab === 'chatAI' && <ChatAi problem={problem} />}
                                 
-                                {/* --- NEW BEAUTIFUL SOLUTIONS TAB --- */}
                                 {activeLeftTab === 'solutions' && (
                                     <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        
-                                        {/* Sticky Header with Dropdown Filter */}
                                         <div className="flex items-center justify-between mb-6 shrink-0 sticky top-0 bg-[#1e1e1e] z-10 py-2 border-b border-white/5">
                                             <h2 className="text-sm font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
                                                 <Code2 size={16} className="text-orange-500"/>
                                                 Solutions
                                             </h2>
                                             
-                                            {/* Dropdown Component */}
                                             <div className="relative group">
                                                 <button className="flex items-center gap-2 px-3 py-1.5 bg-[#252525] hover:bg-[#333] border border-white/10 rounded-lg text-xs font-medium text-gray-200 transition-all shadow-lg">
                                                     <Filter size={12} className="text-gray-400"/>
@@ -670,12 +775,10 @@ const ProblemPage = () => {
                                             </div>
                                         </div>
 
-                                        {/* Solutions List */}
                                         <div className="space-y-8 pb-10">
                                             {problem.referenceSolution
                                                 ?.filter(sol => solutionLang === 'all' || sol.language === solutionLang)
                                                 .map((sol, i) => {
-                                                    // Styling config based on language
                                                     const getStyle = (l) => {
                                                         const lang = l.toLowerCase();
                                                         if (lang.includes('java') && !lang.includes('script')) return { accent: 'bg-orange-500', text: 'text-orange-400', border: 'border-orange-500/30', glow: 'from-orange-500/10' };
@@ -687,11 +790,9 @@ const ProblemPage = () => {
 
                                                     return (
                                                         <div key={i} className="group relative">
-                                                            {/* Background Glow */}
                                                             <div className={`absolute -inset-1 bg-gradient-to-r ${style.glow} to-transparent opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500`}></div>
                                                             
                                                             <div className="relative bg-[#141414] rounded-xl border border-white/10 overflow-hidden shadow-xl transition-all hover:border-white/20">
-                                                                {/* Card Header */}
                                                                 <div className="flex items-center justify-between px-4 py-3 bg-[#1a1a1a] border-b border-white/5">
                                                                     <div className="flex items-center gap-3">
                                                                         <div className={`w-1.5 h-6 rounded-full ${style.accent}`}></div>
@@ -712,9 +813,7 @@ const ProblemPage = () => {
                                                                     </button>
                                                                 </div>
 
-                                                                {/* Code Block */}
                                                                 <div className="relative bg-[#0a0a0a] group/code">
-                                                                    {/* Visual Line Number Gutter */}
                                                                     <div className="absolute left-0 top-0 bottom-0 w-8 border-r border-white/5 bg-[#111] z-10 hidden sm:block"></div>
                                                                     
                                                                     <pre className="p-4 sm:pl-12 font-mono text-[13px] leading-relaxed text-gray-300 overflow-x-auto custom-scrollbar">
@@ -740,7 +839,6 @@ const ProblemPage = () => {
                     </div>
                 </div>
 
-                {/* --- RESIZE DIVIDER --- */}
                 <div 
                     onMouseDown={startResizing}
                     className="w-1.5 h-full cursor-col-resize hover:bg-orange-500/30 transition-colors flex items-center justify-center group shrink-0"
@@ -748,7 +846,7 @@ const ProblemPage = () => {
                     <div className="w-[1px] h-10 bg-white/10 group-hover:bg-orange-500 group-active:h-full transition-all" />
                 </div>
 
-                {/* RIGHT PANEL (EDITOR + CONSOLE) */}
+                {/* RIGHT PANEL */}
                 <div 
                     style={{ width: `${100 - leftWidth}%` }}
                     className="flex flex-col bg-[#1e1e1e] rounded-xl border border-white/10 overflow-hidden shadow-2xl min-w-[150px]"
@@ -776,10 +874,10 @@ const ProblemPage = () => {
                             </div>
                         </div>
                         <div className="flex items-center gap-1">
-                             <button onClick={handleResetCode} className="p-1.5 text-gray-500 hover:text-white transition-colors flex items-center gap-1 group" title="Reset to default code">
+                            <button onClick={handleResetCode} className="p-1.5 text-gray-500 hover:text-white transition-colors flex items-center gap-1 group" title="Reset to default code">
                                 <RotateCcw size={14} className="group-hover:rotate-[-45deg] transition-transform"/>
                                 <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Reset</span>
-                             </button>
+                            </button>
                             <button onClick={() => handleCopy(code, 'main-editor')} className="p-1.5 text-gray-500 hover:text-white transition-colors flex items-center gap-1 group" title="Copy current code">
                                 {copiedId === 'main-editor' ? (
                                     <CheckCircle2 size={14} className="text-emerald-400 animate-in zoom-in" />
@@ -840,7 +938,6 @@ const ProblemPage = () => {
                     </div>
 
                     <div className="flex-1 relative flex flex-col overflow-hidden bg-[#1e1e1e]">
-                        {/* 1. EDITOR AREA */}
                         <div className={`w-full transition-all duration-300 ${isConsoleOpen ? 'h-[60%]' : 'h-full'}`}>
                             <Editor
                                 height="100%"
@@ -865,10 +962,9 @@ const ProblemPage = () => {
                             />
                         </div>
                         
-                        {/* 2. BOTTOM PANEL (CONSOLE) */}
                         {isConsoleOpen && (
                             <div className="h-[40%] flex flex-col border-t border-white/10 bg-[#141414] animate-in slide-in-from-bottom-5 duration-300">
-                                {/* Console Header / Tabs */}
+                                {/* ✨✨✨ CONSOLE TABS WITH AI REVIEW TAB ✨✨✨ */}
                                 <div className="flex items-center justify-between px-4 h-10 bg-[#1a1a1a] border-b border-white/5 shrink-0">
                                     <div className="flex gap-4 h-full">
                                         <button 
@@ -883,6 +979,15 @@ const ProblemPage = () => {
                                         >
                                             <Terminal size={12} /> Run Result
                                         </button>
+                                        {/* ✨ AI REVIEW TAB */}
+                                        {aiReview && (
+                                            <button 
+                                                onClick={() => setActiveRightTab('ai-review')}
+                                                className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider h-full border-b-2 transition-colors ${activeRightTab === 'ai-review' ? 'text-white border-blue-500' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+                                            >
+                                                <MessageSquare size={12} /> AI Review
+                                            </button>
+                                        )}
                                     </div>
                                     <button onClick={() => setIsConsoleOpen(false)} className="text-gray-500 hover:text-white transition-colors">
                                         <ChevronDownIcon size={16} />
@@ -965,7 +1070,7 @@ const ProblemPage = () => {
                                     {activeRightTab === 'result' && (
                                         <div>
                                             {submitResult ? (
-                                                 <div className={`p-4 rounded-xl border ${submitResult.accepted ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                                                <div className={`p-4 rounded-xl border ${submitResult.accepted ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
                                                     <div className={`text-xl font-bold mb-4 flex items-center gap-2 ${submitResult.accepted ? 'text-emerald-400' : 'text-rose-500'}`}>
                                                         {submitResult.accepted ? <CheckCircle2 size={20}/> : <XCircle size={20}/>}
                                                         {submitResult.accepted ? 'Accepted' : 'Wrong Answer'}
@@ -1003,6 +1108,63 @@ const ProblemPage = () => {
                                             )}
                                         </div>
                                     )}
+
+                                    {/* ✨✨✨ AI REVIEW TAB CONTENT ✨✨✨ */}
+                                    {activeRightTab === 'ai-review' && aiReview && (
+                                        <div className="space-y-4">
+                                            {/* Warning Banner */}
+                                            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="p-2 bg-blue-500/20 rounded-lg shrink-0">
+                                                        <AlertCircle className="text-blue-400" size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-bold text-blue-400 mb-1 text-sm">
+                                                            🤖 AI Code Review Mode
+                                                        </h3>
+                                                        <p className="text-xs text-gray-400 leading-relaxed">
+                                                            Your daily execution quota is exhausted. This is AI-powered static analysis, not actual code execution.
+                                                        </p>
+                                                        <div className="flex items-center gap-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded mt-2">
+                                                            <AlertTriangle size={12} className="text-amber-400" />
+                                                            <span className="text-[10px] text-amber-400 font-medium">
+                                                                This is NOT execution - it's a mentor reviewing your logic
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* AI Review Content */}
+                                            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
+                                                <div className="whitespace-pre-wrap text-gray-300 text-sm leading-relaxed">
+                                                    {aiReview}
+                                                </div>
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className="flex gap-3 pt-2">
+                                                <button 
+                                                    onClick={() => setActiveRightTab('testcase')}
+                                                    className="flex-1 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-medium transition-all"
+                                                >
+                                                    View Test Cases
+                                                </button>
+                                                <button 
+                                                    className="flex-1 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 rounded-lg text-xs font-bold shadow-lg transition-all"
+                                                >
+                                                    Upgrade to Premium
+                                                </button>
+                                            </div>
+
+                                            {/* Reset Info */}
+                                            <div className="text-center pt-1">
+                                                <p className="text-[10px] text-gray-500">
+                                                    Your execution quota resets at midnight UTC
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1021,13 +1183,21 @@ const ProblemPage = () => {
                             </button>
                         </div>
                         <div className="flex gap-3">
-                            <button onClick={handleRun} disabled={loading|| quota.runsLeft === 0} className="flex items-center gap-2 px-6 py-2 bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white text-sm font-semibold rounded-lg transition-all disabled:opacity-50 active:scale-95">
+                            <button onClick={handleRun} disabled={loading} className="flex items-center gap-2 px-6 py-2 bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white text-sm font-semibold rounded-lg transition-all disabled:opacity-50 active:scale-95">
                                 <Play size={14} fill="currentColor" />
                                 {loading ? 'Running...' : 'Run'}
                             </button>
-                            <button onClick={handleSubmitCode} disabled={loading|| quota.submitsLeft === 0} className="flex items-center gap-2 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(249,115,22,0.3)] disabled:opacity-50 active:scale-95">
+                            {/* <button onClick={handleSubmitCode} disabled={loading} className="flex items-center gap-2 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(249,115,22,0.3)] disabled:opacity-50 active:scale-95">
                                 <Send size={14} />
                                 {loading ? 'Submitting...' : 'Submit'}
+                            </button> */}
+                            <button 
+                                onClick={handleInitialSubmitClick} // <--- UPDATE THIS LINE
+                                disabled={loading} 
+                                className="flex items-center gap-2 px-6 py-2 bg-orange-500 hover:bg-orange-600 ..."
+                            >
+                                <Send size={14} />
+                                {loading ? 'Processing...' : (quota.submitsLeft > 0 ? 'Submit' : 'AI Analysis')}
                             </button>
                         </div>
                     </div>
