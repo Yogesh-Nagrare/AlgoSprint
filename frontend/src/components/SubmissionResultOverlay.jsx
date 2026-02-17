@@ -20,7 +20,7 @@ const SubmissionResultOverlay = ({ result, onClose, isVisible }) => {
                         <XCircle className="text-rose-500" size={20} />
                     )}
                     <span className={`text-lg font-bold ${isAccepted ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {isAccepted ? 'Accepted' : 'Wrong Answer'}
+                        {isAccepted ? 'Accepted' : 'Wrong Answer || Runtime Error || Time Limit Exceeded'}
                     </span>
                 </div>
                 <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full text-gray-400 transition-colors">

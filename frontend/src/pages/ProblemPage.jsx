@@ -110,6 +110,7 @@ const ProblemPage = () => {
     const [isTimerRunning, setIsTimerRunning] = useState(true);
 
     const editorRef = useRef(null);
+    const selectedLanguageRef = useRef(selectedLanguage); // ✅ ADD THIS
 
     const [settings, setSettings] = useState(() => {
         const saved = localStorage.getItem('editor_settings');
@@ -125,6 +126,14 @@ const ProblemPage = () => {
     useEffect(() => {
         localStorage.setItem('editor_settings', JSON.stringify(settings));
     }, [settings]);
+    useEffect(() => {
+    localStorage.setItem('editor_settings', JSON.stringify(settings));
+    }, [settings]);
+
+    // ✅ ADD THIS RIGHT BELOW
+    useEffect(() => {
+        selectedLanguageRef.current = selectedLanguage;
+    }, [selectedLanguage]);
     
     // --- TIMER LOGIC START ---
     useEffect(() => {
@@ -302,7 +311,8 @@ const ProblemPage = () => {
             // Try normal run first
             const response = await axiosClient.post(`/submission/run/${problemId}`, {
                 code,
-                language: selectedLanguage
+                // language: selectedLanguage
+                language: selectedLanguageRef.current, // ✅ use ref, not state
             });
 
             // ✨ CHECK IF QUOTA EXHAUSTED
@@ -405,7 +415,8 @@ const ProblemPage = () => {
     try {
         const response = await axiosClient.post(`/submission/submit/${problemId}`, {
             code,
-            language: selectedLanguage
+            // language: selectedLanguage
+            language: selectedLanguageRef.current, // ✅ use ref, not state
         });
         
         if (response.data.isAIAnalysis) {
@@ -415,6 +426,8 @@ const ProblemPage = () => {
         } else {
             setSubmitResult(response.data);
             setShowSubmitOverlay(true); // <--- OPEN THE SLIDE OVER
+            setActiveRightTab('result'); // Switch console to "Run Result"
+            setIsConsoleOpen(true);      // Make sure the console is open
             if (response.data.problemStatus) setProblemStatus(response.data.problemStatus);
         }
         await fetchQuota();
@@ -659,7 +672,7 @@ const ProblemPage = () => {
                 {/* LEFT PANEL */}
                 <div 
                     style={{ width: `${leftWidth}%` }}
-                    className="flex flex-col bg-[#1e1e1e] rounded-xl border border-white/10 overflow-hidden shadow-2xl min-w-[150px]"
+                    className="relative flex flex-col bg-[#1e1e1e] rounded-xl border border-white/10 overflow-hidden shadow-2xl min-w-[150px]"
                 >
                     {/* LEFT PANEL */}
                     <SubmissionResultOverlay 
@@ -958,6 +971,7 @@ const ProblemPage = () => {
                                     cursorSmoothCaretAnimation: "on",
                                     fontFamily: "'Fira Code', monospace",
                                     automaticLayout: true,
+                                    
                                 }}
                             />
                         </div>

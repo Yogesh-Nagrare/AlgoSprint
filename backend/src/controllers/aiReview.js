@@ -10,108 +10,56 @@ const getAICodeReview = async (req, res) => {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
-        // Get problem details
         const problem = await Problem.findById(problemId);
-        if (!problem) {
-            return res.status(404).json({ error: "Problem not found" });
-        }
+        if (!problem) return res.status(404).json({ error: "Problem not found" });
 
-        // Initialize Gemini AI (STRICT SDK USAGE)
+        // Initialize with the new SDK patterns
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_KEY });
 
-        // Sanitize code (security + cost control)
-        const sanitizedCode = code.replace(/```/g, "").slice(0, 8000);
-
-        const prompt = `
-You are a strict competitive programming code review mentor.
-
-The user has exceeded their execution quota.
-You MUST perform STATIC ANALYSIS only.
-
-================ STRICT RULES =================
-- NEVER say "your code is correct"
-- NEVER guarantee it passes all tests
-- NEVER simulate real execution
-- Use phrases like: "appears to", "might", "seems like"
-- End response with:
-"⚠️ This is static analysis only. Run code to verify correctness."
-================================================
-
-## Problem: ${problem.title}
-Difficulty: ${problem.difficulty || "Not specified"}
-
-Description:
-${problem.description}
-
-## Visible Test Cases:
-${problem.visibleTestCases.map((tc, i) => `
-Test Case ${i + 1}:
-Input: ${tc.input}
-Expected Output: ${tc.output}
-${tc.explanation ? `Explanation: ${tc.explanation}` : ""}
-`).join("\n")}
-
-## User Code (${language}):
-\`\`\`${language}
-${sanitizedCode}
-\`\`\`
-
-------------------------------------------------
-
-Provide structured response:
-
-1️⃣ Algorithm Used  
-2️⃣ Potential Logical Issues  
-3️⃣ Edge Cases That Might Fail  
-4️⃣ Time & Space Complexity  
-5️⃣ Optimization Suggestions  
-
-Keep response concise and practical.
-`;
-
-        console.log("🤖 Calling Gemini 2.5 Flash...");
-
+        // Content generation with System Instructions
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: prompt,
+            contents: `Analyze this ${language} solution for "${problem.title}".\n\nCode:\n\`\`\`${language}\n${code.slice(0, 8000)}\n\`\`\``,
             config: {
-                temperature: 0.2,
-                maxOutputTokens: 800
+                // systemInstruction is the best place for "behavioral" rules
+                systemInstruction: `You are a world-class Competitive Programming Coach.
+The user's execution quota is exhausted; you are performing STATIC ANALYSIS only.
+
+STRICT PROTOCOLS:
+1. DO NOT claim the code is "correct" or "will pass."
+2. DO NOT simulate execution. Use probabilistic language ("appears to," "could result in").
+3. CRITICAL: Evaluate against Time Limits (TL) and Memory Limits (ML).
+4. Identify common CP pitfalls: Integer overflow (long long), off-by-one errors, recursion limits, and TLE in nested loops.
+
+STRUCTURE YOUR OUTPUT:
+1️⃣ Algorithm: Identify the approach (e.g., Sliding Window, DP, Dijkstra).
+2️⃣ Correctness Risks: Flag logical flaws or edge cases (N=1, empty, max constraints).
+3️⃣ Complexity: Provide Big O for Time & Space.
+4️⃣ Optimization: Suggestions to reduce constant factors or better algorithms.
+
+MANDATORY FOOTER:
+"⚠️ This is static analysis only. Run code to verify correctness."`,
+                temperature: 0.1, // Lower temperature = more technical/consistent
+                maxOutputTokens: 1000,
             }
         });
 
+        // In @google/genai, .text is a property, not a function
         const aiReview = response.text;
-
-        console.log("✅ AI review completed");
 
         return res.status(200).json({
             mode: "ai-review",
             aiReview,
-            message: "Daily execution limit reached. AI static review provided.",
-            upgradePrompt: "Upgrade to Premium for unlimited execution."
+            message: "Static analysis complete.",
+            upgradePrompt: "Upgrade to Premium for real-time execution & private test cases."
         });
 
     } catch (error) {
         console.error("❌ AI Review Error:", error);
-
-        return res.status(200).json({
-            mode: "ai-review",
-            aiReview: `**AI Review Temporarily Unavailable**
-
-The analysis could not be completed.
-
-Possible reasons:
-- API usage limit reached
-- Network issue
-- Temporary AI service interruption
-
-Please try again later or wait for quota reset at midnight UTC.
-
-⚠️ This is static analysis only.`,
-            message: "AI service issue",
-            upgradePrompt: "Upgrade to Premium for unlimited execution."
-        });
+        return res.status(500).json({ error: "AI Review failed to generate." });
     }
 };
 
-module.exports = { getAICodeReview };
+module.exports = {
+    getAICodeReview,
+};
