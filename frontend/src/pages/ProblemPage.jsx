@@ -8,6 +8,8 @@ import axiosClient from "../utils/axiosClient";
 import SubmissionHistory from "../components/SubmissionHistory";
 import ChatAi from '../components/ChatAi';
 import Editorial from '../components/Editorial';
+import MobileProblemPage, { useIsMobile } from '../pages/MobileProblemPage';
+import { useNavigate } from 'react-router';
 import { 
     ChevronDown, 
     Play, 
@@ -55,10 +57,38 @@ const ProblemPage = () => {
     const [showSubmitOverlay, setShowSubmitOverlay] = useState(false);
     // ✨ AI REVIEW STATE (NEW)
     const [aiReview, setAIReview] = useState(null);
+    const [showAIOverlay, setShowAIOverlay] = useState(false); // ← ADD THIS
 
     // --- RESIZING LOGIC START ---
     const [leftWidth, setLeftWidth] = useState(50);
     const isResizing = useRef(false);
+    // --- VERTICAL RESIZING (editor/console split) ---
+    const [consoleHeight, setConsoleHeight] = useState(35); // % of right panel
+    const isResizingConsole = useRef(false);
+
+    const startResizingConsole = useCallback(() => {
+        isResizingConsole.current = true;
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+    }, []);
+
+    const stopResizingConsole = useCallback(() => {
+        isResizingConsole.current = false;
+        document.body.style.cursor = 'default';
+        document.body.style.userSelect = 'auto';
+    }, []);
+
+    const resizeConsole = useCallback((e) => {
+        if (!isResizingConsole.current) return;
+        const rightPanel = document.getElementById('right-panel');
+        if (!rightPanel) return;
+        const rect = rightPanel.getBoundingClientRect();
+        const newHeightPx = rect.bottom - e.clientY;
+        const newHeightPct = (newHeightPx / rect.height) * 100;
+        if (newHeightPct > 10 && newHeightPct < 95) {
+            setConsoleHeight(newHeightPct);
+        }
+    }, []);
 
     const startResizing = useCallback(() => {
         isResizing.current = true;
@@ -77,16 +107,30 @@ const ProblemPage = () => {
         const newWidth = (e.clientX / window.innerWidth) * 100;
         if (newWidth > 20 && newWidth < 80) setLeftWidth(newWidth);
     }, []);
+    const navigate = useNavigate();
 
+    // useEffect(() => {
+    //     window.addEventListener('mousemove', resize);
+    //     window.addEventListener('mouseup', stopResizing);
+    //     return () => {
+    //         window.removeEventListener('mousemove', resize);
+    //         window.removeEventListener('mouseup', stopResizing);
+    //     };
+    // }, [resize, stopResizing]);
+    // // --- RESIZING LOGIC END ---
+    
     useEffect(() => {
         window.addEventListener('mousemove', resize);
         window.addEventListener('mouseup', stopResizing);
+        window.addEventListener('mousemove', resizeConsole);
+        window.addEventListener('mouseup', stopResizingConsole);
         return () => {
             window.removeEventListener('mousemove', resize);
             window.removeEventListener('mouseup', stopResizing);
+            window.removeEventListener('mousemove', resizeConsole);
+            window.removeEventListener('mouseup', stopResizingConsole);
         };
-    }, [resize, stopResizing]);
-    // --- RESIZING LOGIC END ---
+    }, [resize, stopResizing, resizeConsole, stopResizingConsole]);
 
     const [selectedTestCaseIndex, setSelectedTestCaseIndex] = useState(0);
     const [problem, setProblem] = useState(null);
@@ -111,7 +155,7 @@ const ProblemPage = () => {
 
     const editorRef = useRef(null);
     const selectedLanguageRef = useRef(selectedLanguage); // ✅ ADD THIS
-
+    const [runLimitWarning, setRunLimitWarning] = useState(false);
     const [settings, setSettings] = useState(() => {
         const saved = localStorage.getItem('editor_settings');
         return saved ? JSON.parse(saved) : {
@@ -284,6 +328,7 @@ const ProblemPage = () => {
     };
 
     const [quota, setQuota] = useState({ runsLeft: 1, submitsLeft: 1 });
+    // const isMobile = useIsMobile(); // detects viewport < 768 px
 
     const fetchQuota = async () => {
         try {
@@ -303,9 +348,13 @@ const ProblemPage = () => {
         setLoading(true);
         setRunResult(null);
         setAIReview(null); // Clear previous AI review
+        setShowAIOverlay(false); // ← ADD THIS
         setSelectedTestCaseIndex(0);
         setIsConsoleOpen(true);
         setActiveRightTab('testcase');
+        setRunLimitWarning(false); // ← ADD THIS
+
+        
         
         try {
             // Try normal run first
@@ -327,13 +376,10 @@ const ProblemPage = () => {
 
                 // Set AI review and switch to AI tab
                 setAIReview(aiResponse.data.aiReview);
-                setActiveRightTab('ai-review');
+                setShowAIOverlay(true);   // ← opens overlay on left panel
                 setQuota(prev => ({ ...prev, runsLeft: 0 }));
+                setRunLimitWarning(true);
 
-                showNotice(
-                    aiResponse.data.message,
-                    aiResponse.data.upgradePrompt
-                );
             } else {
                 // Normal execution result
                 setRunResult(response.data);
@@ -343,8 +389,7 @@ const ProblemPage = () => {
         } catch (error) {
             if (error.response?.status === 429) {
                 setQuota(prev => ({ ...prev, runsLeft: 0 }));
-                showNotice("Daily Run Limit Reached", error.response.data.detail);
-            } else {
+                setRunLimitWarning(true);            } else {
                 setRunResult({ success: false, error: 'Internal server error' });
             }
         } finally {
@@ -434,7 +479,7 @@ const ProblemPage = () => {
         } catch (error) {
             if (error.response?.status === 429) {
                 setQuota(prev => ({ ...prev, submitsLeft: 0 }));
-                showNotice("Daily Submission Limit Reached", error.response.data.detail);
+                setRunLimitWarning(true);
             }
         } finally {
             setLoading(false);
@@ -470,7 +515,90 @@ const ProblemPage = () => {
             default: return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
         }
     };
+    const isMobile = useIsMobile();
+if (isMobile) {
+  return (
+    <MobileProblemPage
+      // ── problem ──
+      problem={problem}
+      problemId={problemId}
+      problemStatus={problemStatus}
+      loading={loading}
 
+      // ── code / language ──
+      code={code}
+      selectedLanguage={selectedLanguage}
+      settings={settings}
+      editorRef={editorRef}
+      handleEditorChange={handleEditorChange}
+      handleEditorDidMount={handleEditorDidMount}
+      handleLanguageChange={handleLanguageChange}
+      handleResetCode={handleResetCode}
+      setSettings={setSettings}
+
+      // ── run / submit ──
+      handleRun={handleRun}
+      handleInitialSubmitClick={handleInitialSubmitClick}
+      runResult={runResult}
+      submitResult={submitResult}
+      quota={quota}
+
+      // ── console / tabs ──
+      activeRightTab={activeRightTab}
+      setActiveRightTab={setActiveRightTab}
+      selectedTestCaseIndex={selectedTestCaseIndex}
+      setSelectedTestCaseIndex={setSelectedTestCaseIndex}
+      aiReview={aiReview}
+
+      // ── timer ──
+      elapsedTime={elapsedTime}
+      isTimerRunning={isTimerRunning}
+      toggleTimer={toggleTimer}
+      handleResetTimer={handleResetTimer}
+      formatTime={formatTime}
+
+      // ── modals ──
+      notification={notification}
+      setNotification={setNotification}
+      isSubmitModalOpen={isSubmitModalOpen}
+      setIsSubmitModalOpen={setIsSubmitModalOpen}
+      executeFinalSubmit={executeFinalSubmit}
+      showSubmitOverlay={showSubmitOverlay}
+      setShowSubmitOverlay={setShowSubmitOverlay}
+      showAIOverlay={showAIOverlay}
+        setShowAIOverlay={setShowAIOverlay}
+        runLimitWarning={runLimitWarning}
+        setRunLimitWarning={setRunLimitWarning}
+      // ── misc ──
+      copiedId={copiedId}
+      handleCopy={handleCopy}
+      getDifficultyColor={getDifficultyColor}
+      getStatusBadge={getStatusBadge}
+      solutionLang={solutionLang}
+      setSolutionLang={setSolutionLang}
+
+      // ── child components rendered as JSX ──
+      // Pass the rendered components so MobileProblemPage doesn't need
+      // to import them itself (they already receive their own props inside ProblemPage).
+      SubmissionHistoryComponent={<SubmissionHistory problemId={problemId} />}
+      ChatAiComponent={<ChatAi problem={problem} />}
+      EditorialComponent={
+        <Editorial
+          secureUrl={problem?.secureUrl}
+          thumbnailUrl={problem?.thumbnailUrl}
+          duration={problem?.duration}
+        />
+      }
+      SubmissionResultOverlayComponent={
+        <SubmissionResultOverlay
+          result={submitResult}
+          isVisible={showSubmitOverlay}
+          onClose={() => setShowSubmitOverlay(false)}
+        />
+      }
+    />
+  );
+}
     if (loading && !problem) {
         return (
             <div className="flex flex-col justify-center items-center min-h-screen bg-[#0a0a0a]">
@@ -579,7 +707,7 @@ const ProblemPage = () => {
                     </div>
                 </div>
 
-                <button className="relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500 transition-all duration-300 group/btn">
+                <button     onClick={() => navigate('/subscription')} className="relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500 transition-all duration-300 group/btn">
                     <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 group-hover/btn:text-black">
                         Get Unlimited Access
                     </span>
@@ -680,6 +808,178 @@ const ProblemPage = () => {
                         isVisible={showSubmitOverlay} 
                         onClose={() => setShowSubmitOverlay(false)} 
                     />
+                    {showAIOverlay && aiReview && (
+                    <div className="absolute inset-0 z-50 flex flex-col bg-[#0d0d0d] animate-in fade-in slide-in-from-bottom-4 duration-400 font-mono">
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-[#1a1a1a] border-b border-white/10 shrink-0">
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_6px_#f43f5e]"></div>
+                                <div className="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24]"></div>
+                                <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]"></div>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-0.5 bg-black/30 rounded-md border border-white/5">
+                                <Terminal size={11} className="text-gray-500" />
+                                <span className="text-[11px] text-gray-400 tracking-wider font-mono">judge — static-analysis</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                                    <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest font-sans">AI Mode</span>
+                                </div>
+                                <button onClick={() => setShowAIOverlay(false)} className="p-1 rounded-md hover:bg-white/10 text-gray-500 hover:text-white transition-colors">
+                                    <X size={15} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                <span className="text-gray-600 text-xs">:</span>
+                                <span className="text-blue-400 text-xs">~/submissions</span>
+                                <span className="text-gray-600 text-xs">$</span>
+                                <span className="text-gray-300 text-xs ml-1">run --static-analysis --ai</span>
+                            </div>
+                            <div className="border-t border-white/5 mb-4"></div>
+                            <pre className="whitespace-pre-wrap text-xs leading-[1.9] text-gray-300 font-mono selection:bg-orange-500/20">
+                                {aiReview.split('\n').map((line, i) => {
+                                    if (line.startsWith('$ ')) return <span key={i} className="text-emerald-400 block">{line}</span>;
+                                    if (line.includes('[COMPILE ERROR]') || line.includes('FAIL')) return <span key={i} className="text-rose-400 block">{line}</span>;
+                                    if (line.includes('[COMPILE OK]') || line.includes('PASS') || line.includes('Likely Correct')) return <span key={i} className="text-emerald-400 block">{line}</span>;
+                                    if (line.includes('[RUNNING') || line.includes('[VERDICT]')) return <span key={i} className="text-amber-400 font-bold block">{line}</span>;
+                                    if (line.includes('RuntimeError') || line.includes('TypeError') || line.includes('error:') || line.includes('TLE')) return <span key={i} className="text-rose-300 block">{line}</span>;
+                                    if (line.includes('[COMPLEXITY ANALYSIS]') || line.includes('[NOTE]')) return <span key={i} className="text-blue-400 block">{line}</span>;
+                                    if (line.includes('Time:') || line.includes('Space:')) return <span key={i} className="text-purple-400 block">{line}</span>;
+                                    if (line.includes('⚠')) return <span key={i} className="text-amber-300 block">{line}</span>;
+                                    return <span key={i} className="block">{line}</span>;
+                                })}
+                            </pre>
+                            <div className="flex items-center gap-1 mt-3">
+                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                <span className="text-gray-600 text-xs">:</span>
+                                <span className="text-blue-400 text-xs">~/submissions</span>
+                                <span className="text-gray-600 text-xs">$</span>
+                                <span className="inline-block w-2 h-3.5 bg-gray-300 ml-1 animate-[blink_1s_step-end_infinite]"></span>
+                            </div>
+                        </div>
+
+                        <div className="shrink-0 px-5 pb-4 pt-3 border-t border-white/5 bg-[#111] space-y-3">
+                            <div className="flex gap-2 font-sans">
+                                <button onClick={() => setShowAIOverlay(false)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold border border-white/5 text-gray-300">
+                                    <X size={12} /> Close
+                                </button>
+                                <button className="flex-1 flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg text-xs font-bold text-white">
+                                    <Rocket size={12} /> Unlock Real Execution
+                                </button>
+                            </div>
+                            <p className="text-center text-[10px] text-gray-600 font-sans">
+                                ⚡ Static analysis only · Quota resets midnight UTC ·
+                                <span className="text-blue-500/70"> AI powered by Gemini 2.5 Flash</span>
+                            </p>
+                        </div>
+                    </div>
+                )}
+                    {/* ✨ AI TERMINAL OVERLAY — covers left panel on run quota exhausted */}
+                    {showAIOverlay && aiReview && (
+                        <div className="absolute inset-0 z-50 flex flex-col bg-[#0d0d0d] animate-in fade-in slide-in-from-bottom-4 duration-400 font-mono">
+                            {/* Header bar */}
+                            <div className="flex items-center justify-between px-4 py-2.5 bg-[#1a1a1a] border-b border-white/10 shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_6px_#f43f5e]"></div>
+                                    <div className="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24]"></div>
+                                    <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]"></div>
+                                </div>
+                                <div className="flex items-center gap-2 px-3 py-0.5 bg-black/30 rounded-md border border-white/5">
+                                    <Terminal size={11} className="text-gray-500" />
+                                    <span className="text-[11px] text-gray-400 tracking-wider font-mono">judge — static-analysis</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                                        <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest font-sans">AI Mode</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowAIOverlay(false)}
+                                        className="p-1 rounded-md hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+                                        title="Close AI Review"
+                                    >
+                                        <X size={15} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Terminal body — scrollable */}
+                            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+                                {/* Prompt line */}
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                    <span className="text-gray-600 text-xs">:</span>
+                                    <span className="text-blue-400 text-xs">~/submissions</span>
+                                    <span className="text-gray-600 text-xs">$</span>
+                                    <span className="text-gray-300 text-xs ml-1">run --static-analysis --ai</span>
+                                </div>
+                                <div className="border-t border-white/5 mb-4"></div>
+
+                                {/* Colored output */}
+                                <pre className="whitespace-pre-wrap text-xs leading-[1.9] text-gray-300 font-mono selection:bg-orange-500/20">
+                                    {aiReview.split('\n').map((line, i) => {
+                                        if (line.startsWith('$ '))
+                                            return <span key={i} className="text-emerald-400 block">{line}</span>;
+                                        if (line.includes('[COMPILE ERROR]') || line.includes('[BUILD FAILED]') || line.includes('FAIL'))
+                                            return <span key={i} className="text-rose-400 block">{line}</span>;
+                                        if (line.includes('[COMPILE OK]') || line.includes('PASS') || line.includes('Likely Correct'))
+                                            return <span key={i} className="text-emerald-400 block">{line}</span>;
+                                        if (line.includes('[RUNNING') || line.includes('[VERDICT]'))
+                                            return <span key={i} className="text-amber-400 font-bold block">{line}</span>;
+                                        if (line.includes('[STDERR]') || line.includes('RuntimeError') || line.includes('TypeError') || line.includes('Exception') || line.includes('error:') || line.includes('SIGSEGV') || line.includes('TLE'))
+                                            return <span key={i} className="text-rose-300 block">{line}</span>;
+                                        if (line.includes('[COMPLEXITY ANALYSIS]') || line.includes('[NOTE]'))
+                                            return <span key={i} className="text-blue-400 block">{line}</span>;
+                                        if (line.includes('Time:') || line.includes('Space:'))
+                                            return <span key={i} className="text-purple-400 block">{line}</span>;
+                                        if (line.includes('├─') || line.includes('└─'))
+                                            return <span key={i} className="text-gray-400 block">{line}</span>;
+                                        if (line.startsWith('━') || line.startsWith('─'))
+                                            return <span key={i} className="text-white/10 block">{line}</span>;
+                                        if (line.includes('stdin:') || line.includes('expected:') || line.includes('got:'))
+                                            return <span key={i} className="text-cyan-400 block">{line}</span>;
+                                        if (line.includes('⚠'))
+                                            return <span key={i} className="text-amber-300 block">{line}</span>;
+                                        return <span key={i} className="block">{line}</span>;
+                                    })}
+                                </pre>
+
+                                {/* Blinking cursor */}
+                                <div className="flex items-center gap-1 mt-3">
+                                    <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                    <span className="text-gray-600 text-xs">:</span>
+                                    <span className="text-blue-400 text-xs">~/submissions</span>
+                                    <span className="text-gray-600 text-xs">$</span>
+                                    <span className="inline-block w-2 h-3.5 bg-gray-300 ml-1 animate-[blink_1s_step-end_infinite]"></span>
+                                </div>
+                            </div>
+
+                            {/* Footer actions */}
+                            <div className="shrink-0 px-5 pb-4 pt-3 border-t border-white/5 bg-[#111] space-y-3">
+                                <div className="flex gap-2 font-sans">
+                                    <button
+                                        onClick={() => setShowAIOverlay(false)}
+                                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold transition-all border border-white/5 hover:border-white/10 text-gray-300"
+                                    >
+                                        <X size={12} />
+                                        Close
+                                    </button>
+                                    <button className="flex-1 flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 rounded-lg text-xs font-bold shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all text-white">
+                                        <Rocket size={12} />
+                                        Unlock Real Execution
+                                    </button>
+                                </div>
+                                <p className="text-center text-[10px] text-gray-600 font-sans">
+                                    ⚡ Static analysis only &nbsp;·&nbsp; Quota resets midnight UTC &nbsp;·&nbsp;
+                                    <span className="text-blue-500/70">AI powered by Gemini 2.5 Flash</span>
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     <div className="flex items-center bg-[#252525] border-b border-white/5 px-2 overflow-x-auto whitespace-nowrap custom-scrollbar shrink-0">
                         {[
                             { id: 'description', label: 'Description', icon: <FileText size={14}/> },
@@ -861,6 +1161,7 @@ const ProblemPage = () => {
 
                 {/* RIGHT PANEL */}
                 <div 
+                    id="right-panel"
                     style={{ width: `${100 - leftWidth}%` }}
                     className="flex flex-col bg-[#1e1e1e] rounded-xl border border-white/10 overflow-hidden shadow-2xl min-w-[150px]"
                 >
@@ -951,8 +1252,7 @@ const ProblemPage = () => {
                     </div>
 
                     <div className="flex-1 relative flex flex-col overflow-hidden bg-[#1e1e1e]">
-                        <div className={`w-full transition-all duration-300 ${isConsoleOpen ? 'h-[60%]' : 'h-full'}`}>
-                            <Editor
+                            <div style={{ height: isConsoleOpen ? `${100 - consoleHeight}%` : '100%' }} className="w-full transition-none">                            <Editor
                                 height="100%"
                                 key={`${problemId}-${selectedLanguage}`}
                                 language={selectedLanguage === 'cpp' ? 'cpp' : selectedLanguage}
@@ -976,212 +1276,271 @@ const ProblemPage = () => {
                             />
                         </div>
                         
-                        {isConsoleOpen && (
-                            <div className="h-[40%] flex flex-col border-t border-white/10 bg-[#141414] animate-in slide-in-from-bottom-5 duration-300">
-                                {/* ✨✨✨ CONSOLE TABS WITH AI REVIEW TAB ✨✨✨ */}
-                                <div className="flex items-center justify-between px-4 h-10 bg-[#1a1a1a] border-b border-white/5 shrink-0">
-                                    <div className="flex gap-4 h-full">
+            {isConsoleOpen && (
+                <>
+                    {/* ── VERTICAL DRAG HANDLE ── */}
+                    <div
+                        onMouseDown={startResizingConsole}
+                        className="h-2 w-full cursor-row-resize flex items-center justify-center group shrink-0 hover:bg-orange-500/20 transition-colors"
+                    >
+                        <div className="w-16 h-[3px] rounded-full bg-white/10 group-hover:bg-orange-500 group-hover:w-24 group-active:w-full transition-all duration-150" />
+                    </div>
+
+                    <div
+                        style={{ height: `${consoleHeight}%` }}
+                        className="flex flex-col border-t border-white/10 bg-[#141414]"
+                    >
+                        {/* ✨✨✨ CONSOLE TABS WITH AI REVIEW TAB ✨✨✨ */}
+                        <div className="flex items-center justify-between px-4 h-10 bg-[#1a1a1a] border-b border-white/5 shrink-0">
+                            <div className="flex gap-4 h-full">
+                                <button 
+                                    onClick={() => setActiveRightTab('testcase')}
+                                    className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider h-full border-b-2 transition-colors ${activeRightTab === 'testcase' ? 'text-white border-orange-500' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+                                >
+                                    <CheckCircle2 size={12} /> Testcase
+                                </button>
+                                <button 
+                                    onClick={() => setActiveRightTab('result')}
+                                    className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider h-full border-b-2 transition-colors ${activeRightTab === 'result' ? 'text-white border-orange-500' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+                                >
+                                    <Terminal size={12} /> Run Result
+                                </button>
+                                {aiReview && (
+                                    <button 
+                                        onClick={() => setActiveRightTab('ai-review')}
+                                        className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider h-full border-b-2 transition-colors ${activeRightTab === 'ai-review' ? 'text-white border-blue-500' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+                                    >
+                                        <MessageSquare size={12} /> AI Review
+                                    </button>
+                                )}
+                            </div>
+                            <button onClick={() => setIsConsoleOpen(false)} className="text-gray-500 hover:text-white transition-colors">
+                                <ChevronDownIcon size={16} />
+                            </button>
+                        </div>
+
+                        {/* Console Body */}
+                        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                            {activeRightTab === 'testcase' && (
+                                <div className="space-y-4">
+                                    <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                                        {(runResult?.testCases || problem?.visibleTestCases || []).map((tc, index) => {
+                                            let statusColor = 'bg-gray-600'; 
+                                            if (runResult) {
+                                                statusColor = tc.status_id === 3 ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#f43f5e]';
+                                            }
+                                            return (
+                                                <button
+                                                    key={index}
+                                                    onClick={() => setSelectedTestCaseIndex(index)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border shrink-0 flex items-center gap-2 ${
+                                                        selectedTestCaseIndex === index
+                                                            ? 'bg-white/10 border-white/20 text-white'
+                                                            : 'bg-transparent border-transparent text-gray-500 hover:bg-white/5'
+                                                    }`}
+                                                >
+                                                    {runResult && (
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${statusColor}`}></span>
+                                                    )}
+                                                    Case {index + 1}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {(() => {
+                                        const currentCase = runResult 
+                                            ? runResult.testCases?.[selectedTestCaseIndex] 
+                                            : problem?.visibleTestCases?.[selectedTestCaseIndex];
+                                        
+                                        if (!currentCase) return <div className="text-gray-500 text-xs">No test case selected</div>;
+
+                                        return (
+                                            <div className="space-y-3 animate-in fade-in duration-200">
+                                                {runResult && (
+                                                    <div className={`text-xs font-bold mb-2 ${currentCase.status_id === 3 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                                                        {currentCase.status_id === 3 ? 'Passed' : 'Runtime Error / Wrong Answer'}
+                                                    </div>
+                                                )}
+                                                <div className="space-y-1">
+                                                    <div className="text-[10px] font-bold uppercase text-gray-500">Input</div>
+                                                    <div className="bg-[#1e1e1e] p-3 rounded-lg text-gray-300 font-mono text-xs border border-white/5">
+                                                        {currentCase.stdin || currentCase.input}
+                                                    </div>
+                                                </div>
+                                                {runResult && (
+                                                    <div className="space-y-1">
+                                                        <div className="text-[10px] font-bold uppercase text-gray-500">Output</div>
+                                                        <div className={`p-3 rounded-lg font-mono text-xs border border-white/5 ${currentCase.stdout ? 'bg-[#1e1e1e] text-white' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                            {currentCase.stdout || 'No output (Error)'}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div className="space-y-1">
+                                                    <div className="text-[10px] font-bold uppercase text-gray-500">Expected Output</div>
+                                                    <div className="bg-[#1e1e1e] p-3 rounded-lg text-gray-300 font-mono text-xs border border-white/5">
+                                                        {currentCase.expected_output || currentCase.output}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+
+                            {activeRightTab === 'result' && (
+                                <div>
+                                    {submitResult ? (
+                                        <div className={`p-4 rounded-xl border ${submitResult.accepted ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                                            <div className={`text-xl font-bold mb-4 flex items-center gap-2 ${submitResult.accepted ? 'text-emerald-400' : 'text-rose-500'}`}>
+                                                {submitResult.accepted ? <CheckCircle2 size={20}/> : <XCircle size={20}/>}
+                                                {submitResult.accepted ? 'Accepted' : 'Wrong Answer'}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4 text-xs">
+                                                <div className="bg-white/5 p-3 rounded-lg">
+                                                    <span className="text-gray-500 block mb-1">Runtime</span>
+                                                    <span className="text-white font-mono">{submitResult.runtime} ms</span>
+                                                </div>
+                                                <div className="bg-white/5 p-3 rounded-lg">
+                                                    <span className="text-gray-500 block mb-1">Memory</span>
+                                                    <span className="text-white font-mono">{submitResult.memory} KB</span>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <div className="flex justify-between text-gray-400 mb-1">
+                                                        <span>Test Cases</span>
+                                                        <span>{submitResult.passedTestCases} / {submitResult.totalTestCases}</span>
+                                                    </div>
+                                                    <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className={`h-full ${submitResult.accepted ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                                            style={{ width: `${(submitResult.passedTestCases / submitResult.totalTestCases) * 100}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2 mt-8">
+                                            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+                                                <Send size={20} />
+                                            </div>
+                                            <p className="text-xs">Submit your code to see results here</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ✨✨✨ AI REVIEW TAB CONTENT ✨✨✨ */}
+                            {activeRightTab === 'ai-review' && aiReview && (
+                                <div className="space-y-3 font-mono">
+                                    
+                                    {/* Terminal Header Bar */}
+                                    <div className="bg-[#1a1a1a] rounded-xl overflow-hidden border border-white/10 shadow-2xl">
+                                        {/* macOS-style title bar */}
+                                        <div className="flex items-center justify-between px-4 py-2.5 bg-[#252525] border-b border-white/5">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_6px_#f43f5e]"></div>
+                                                <div className="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24]"></div>
+                                                <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]"></div>
+                                            </div>
+                                            <div className="flex items-center gap-2 px-3 py-0.5 bg-black/30 rounded-md border border-white/5">
+                                                <Terminal size={11} className="text-gray-500" />
+                                                <span className="text-[11px] text-gray-400 tracking-wider">judge — static-analysis</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                                                <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">AI Mode</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Terminal Body */}
+                                        <div className="p-4 bg-[#0d0d0d] min-h-[200px]">
+                                            {/* Prompt line */}
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                                <span className="text-gray-600 text-xs">:</span>
+                                                <span className="text-blue-400 text-xs">~/submissions</span>
+                                                <span className="text-gray-600 text-xs">$</span>
+                                                <span className="text-gray-300 text-xs ml-1 animate-pulse">run --static-analysis --ai</span>
+                                            </div>
+
+                                            {/* Divider */}
+                                            <div className="border-t border-white/5 mb-3"></div>
+
+                                            {/* AI Output */}
+                                            <pre className="whitespace-pre-wrap text-xs leading-[1.8] text-gray-300 font-mono
+                                                [&>*]:block
+                                                selection:bg-orange-500/20"
+                                                style={{
+                                                    // Syntax-highlight key terminal tokens via CSS-in-JS
+                                                    // We'll handle coloring via a render function below
+                                                }}
+                                            >
+                                                {aiReview.split('\n').map((line, i) => {
+                                                    // Color rules matching terminal output patterns
+                                                    if (line.startsWith('$ '))
+                                                        return <span key={i} className="text-emerald-400 block">{line}</span>;
+                                                    if (line.includes('[COMPILE ERROR]') || line.includes('[BUILD FAILED]') || line.includes('FAIL'))
+                                                        return <span key={i} className="text-rose-400 block">{line}</span>;
+                                                    if (line.includes('[COMPILE OK]') || line.includes('PASS') || line.includes('Likely Correct'))
+                                                        return <span key={i} className="text-emerald-400 block">{line}</span>;
+                                                    if (line.includes('[RUNNING') || line.includes('[VERDICT]'))
+                                                        return <span key={i} className="text-amber-400 font-bold block">{line}</span>;
+                                                    if (line.includes('[STDERR]') || line.includes('RuntimeError') || line.includes('TypeError') || line.includes('Exception') || line.includes('error:') || line.includes('SIGSEGV') || line.includes('TLE'))
+                                                        return <span key={i} className="text-rose-300 block">{line}</span>;
+                                                    if (line.includes('[COMPLEXITY ANALYSIS]') || line.includes('[NOTE]'))
+                                                        return <span key={i} className="text-blue-400 block">{line}</span>;
+                                                    if (line.includes('Time:') || line.includes('Space:'))
+                                                        return <span key={i} className="text-purple-400 block">{line}</span>;
+                                                    if (line.includes('├─') || line.includes('└─'))
+                                                        return <span key={i} className="text-gray-400 block">{line}</span>;
+                                                    if (line.startsWith('━') || line.startsWith('─'))
+                                                        return <span key={i} className="text-white/10 block">{line}</span>;
+                                                    if (line.includes('stdin:') || line.includes('expected:') || line.includes('got:'))
+                                                        return <span key={i} className="text-cyan-400 block">{line}</span>;
+                                                    if (line.includes('⚠'))
+                                                        return <span key={i} className="text-amber-300 block">{line}</span>;
+                                                    return <span key={i} className="block">{line}</span>;
+                                                })}
+                                            </pre>
+
+                                            {/* Blinking cursor */}
+                                            <div className="flex items-center gap-1 mt-3">
+                                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                                <span className="text-gray-600 text-xs">:</span>
+                                                <span className="text-blue-400 text-xs">~/submissions</span>
+                                                <span className="text-gray-600 text-xs">$</span>
+                                                <span className="inline-block w-2 h-3.5 bg-gray-300 ml-1 animate-[blink_1s_step-end_infinite]"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Row */}
+                                    <div className="flex gap-2">
                                         <button 
                                             onClick={() => setActiveRightTab('testcase')}
-                                            className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider h-full border-b-2 transition-colors ${activeRightTab === 'testcase' ? 'text-white border-orange-500' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold transition-all border border-white/5 hover:border-white/10 font-sans"
                                         >
-                                            <CheckCircle2 size={12} /> Testcase
+                                            <CheckCircle2 size={12} className="text-gray-400"/>
+                                            View Test Cases
                                         </button>
-                                        <button 
-                                            onClick={() => setActiveRightTab('result')}
-                                            className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider h-full border-b-2 transition-colors ${activeRightTab === 'result' ? 'text-white border-orange-500' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
-                                        >
-                                            <Terminal size={12} /> Run Result
+                                        <button className="flex-1 flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 rounded-lg text-xs font-bold shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all font-sans">
+                                            <Rocket size={12}/>
+                                            Unlock Real Execution
                                         </button>
-                                        {/* ✨ AI REVIEW TAB */}
-                                        {aiReview && (
-                                            <button 
-                                                onClick={() => setActiveRightTab('ai-review')}
-                                                className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider h-full border-b-2 transition-colors ${activeRightTab === 'ai-review' ? 'text-white border-blue-500' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
-                                            >
-                                                <MessageSquare size={12} /> AI Review
-                                            </button>
-                                        )}
                                     </div>
-                                    <button onClick={() => setIsConsoleOpen(false)} className="text-gray-500 hover:text-white transition-colors">
-                                        <ChevronDownIcon size={16} />
-                                    </button>
+
+                                    {/* Footer */}
+                                    <p className="text-center text-[10px] text-gray-600 font-sans">
+                                        ⚡ Static analysis only &nbsp;·&nbsp; Quota resets midnight UTC &nbsp;·&nbsp; 
+                                        <span className="text-blue-500/70">AI powered by Gemini 2.5 Flash</span>
+                                    </p>
                                 </div>
-
-                                {/* Console Body */}
-                                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                                    {activeRightTab === 'testcase' && (
-                                        <div className="space-y-4">
-                                            <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
-                                                {(runResult?.testCases || problem?.visibleTestCases || []).map((tc, index) => {
-                                                    let statusColor = 'bg-gray-600'; 
-                                                    if (runResult) {
-                                                        statusColor = tc.status_id === 3 ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#f43f5e]';
-                                                    }
-
-                                                    return (
-                                                        <button
-                                                            key={index}
-                                                            onClick={() => setSelectedTestCaseIndex(index)}
-                                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border shrink-0 flex items-center gap-2 ${
-                                                                selectedTestCaseIndex === index
-                                                                    ? 'bg-white/10 border-white/20 text-white'
-                                                                    : 'bg-transparent border-transparent text-gray-500 hover:bg-white/5'
-                                                            }`}
-                                                        >
-                                                            {runResult && (
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${statusColor}`}></span>
-                                                            )}
-                                                            Case {index + 1}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            {(() => {
-                                                const currentCase = runResult 
-                                                    ? runResult.testCases?.[selectedTestCaseIndex] 
-                                                    : problem?.visibleTestCases?.[selectedTestCaseIndex];
-                                                
-                                                if (!currentCase) return <div className="text-gray-500 text-xs">No test case selected</div>;
-
-                                                return (
-                                                    <div className="space-y-3 animate-in fade-in duration-200">
-                                                        {runResult && (
-                                                            <div className={`text-xs font-bold mb-2 ${currentCase.status_id === 3 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                                                                {currentCase.status_id === 3 ? 'Passed' : 'Runtime Error / Wrong Answer'}
-                                                            </div>
-                                                        )}
-
-                                                        <div className="space-y-1">
-                                                            <div className="text-[10px] font-bold uppercase text-gray-500">Input</div>
-                                                            <div className="bg-[#1e1e1e] p-3 rounded-lg text-gray-300 font-mono text-xs border border-white/5">
-                                                                {currentCase.stdin || currentCase.input}
-                                                            </div>
-                                                        </div>
-
-                                                        {runResult && (
-                                                            <div className="space-y-1">
-                                                                <div className="text-[10px] font-bold uppercase text-gray-500">Output</div>
-                                                                <div className={`p-3 rounded-lg font-mono text-xs border border-white/5 ${currentCase.stdout ? 'bg-[#1e1e1e] text-white' : 'bg-rose-500/10 text-rose-400'}`}>
-                                                                    {currentCase.stdout || 'No output (Error)'}
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        <div className="space-y-1">
-                                                            <div className="text-[10px] font-bold uppercase text-gray-500">Expected Output</div>
-                                                            <div className="bg-[#1e1e1e] p-3 rounded-lg text-gray-300 font-mono text-xs border border-white/5">
-                                                                {currentCase.expected_output || currentCase.output}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
-                                    )}
-
-                                    {activeRightTab === 'result' && (
-                                        <div>
-                                            {submitResult ? (
-                                                <div className={`p-4 rounded-xl border ${submitResult.accepted ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
-                                                    <div className={`text-xl font-bold mb-4 flex items-center gap-2 ${submitResult.accepted ? 'text-emerald-400' : 'text-rose-500'}`}>
-                                                        {submitResult.accepted ? <CheckCircle2 size={20}/> : <XCircle size={20}/>}
-                                                        {submitResult.accepted ? 'Accepted' : 'Wrong Answer'}
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-4 text-xs">
-                                                        <div className="bg-white/5 p-3 rounded-lg">
-                                                            <span className="text-gray-500 block mb-1">Runtime</span>
-                                                            <span className="text-white font-mono">{submitResult.runtime} ms</span>
-                                                        </div>
-                                                        <div className="bg-white/5 p-3 rounded-lg">
-                                                            <span className="text-gray-500 block mb-1">Memory</span>
-                                                            <span className="text-white font-mono">{submitResult.memory} KB</span>
-                                                        </div>
-                                                        <div className="col-span-2">
-                                                            <div className="flex justify-between text-gray-400 mb-1">
-                                                                <span>Test Cases</span>
-                                                                <span>{submitResult.passedTestCases} / {submitResult.totalTestCases}</span>
-                                                            </div>
-                                                            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                                                                <div 
-                                                                    className={`h-full ${submitResult.accepted ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                                                                    style={{ width: `${(submitResult.passedTestCases / submitResult.totalTestCases) * 100}%` }}
-                                                                ></div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2 mt-8">
-                                                    <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
-                                                        <Send size={20} />
-                                                    </div>
-                                                    <p className="text-xs">Submit your code to see results here</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* ✨✨✨ AI REVIEW TAB CONTENT ✨✨✨ */}
-                                    {activeRightTab === 'ai-review' && aiReview && (
-                                        <div className="space-y-4">
-                                            {/* Warning Banner */}
-                                            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                                                <div className="flex items-start gap-3">
-                                                    <div className="p-2 bg-blue-500/20 rounded-lg shrink-0">
-                                                        <AlertCircle className="text-blue-400" size={20} />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="font-bold text-blue-400 mb-1 text-sm">
-                                                            🤖 AI Code Review Mode
-                                                        </h3>
-                                                        <p className="text-xs text-gray-400 leading-relaxed">
-                                                            Your daily execution quota is exhausted. This is AI-powered static analysis, not actual code execution.
-                                                        </p>
-                                                        <div className="flex items-center gap-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded mt-2">
-                                                            <AlertTriangle size={12} className="text-amber-400" />
-                                                            <span className="text-[10px] text-amber-400 font-medium">
-                                                                This is NOT execution - it's a mentor reviewing your logic
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* AI Review Content */}
-                                            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-                                                <div className="whitespace-pre-wrap text-gray-300 text-sm leading-relaxed">
-                                                    {aiReview}
-                                                </div>
-                                            </div>
-
-                                            {/* Action Buttons */}
-                                            <div className="flex gap-3 pt-2">
-                                                <button 
-                                                    onClick={() => setActiveRightTab('testcase')}
-                                                    className="flex-1 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-medium transition-all"
-                                                >
-                                                    View Test Cases
-                                                </button>
-                                                <button 
-                                                    className="flex-1 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 rounded-lg text-xs font-bold shadow-lg transition-all"
-                                                >
-                                                    Upgrade to Premium
-                                                </button>
-                                            </div>
-
-                                            {/* Reset Info */}
-                                            <div className="text-center pt-1">
-                                                <p className="text-[10px] text-gray-500">
-                                                    Your execution quota resets at midnight UTC
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
                     </div>
 
                     <div className="h-16 bg-[#252525] border-t border-white/5 flex items-center justify-between px-6 shrink-0">
@@ -1196,6 +1555,35 @@ const ProblemPage = () => {
                                 AI Tutor
                             </button>
                         </div>
+                         {/* ✨ RUN LIMIT WARNING — sits between left buttons and run/submit
+                        {runLimitWarning && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <AlertTriangle size={13} className="text-amber-400 shrink-0" />
+                                <span className="text-[11px] text-amber-300 font-medium">
+                                    Run limit reached — showing AI analysis
+                                </span>
+                                <button
+                                    onClick={() => setRunLimitWarning(false)}
+                                    className="ml-1 text-amber-500/60 hover:text-amber-300 transition-colors"
+                                >
+                                    <X size={11} />
+                                </button>
+                            </div>
+                        )} */}
+                        {runLimitWarning && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 animate-in fade-in duration-300">
+                                <AlertTriangle size={13} className="text-amber-400 shrink-0" />
+                                <span className="text-[11px] text-amber-300 font-medium">
+                                    Run limit reached — showing AI analysis
+                                </span>
+                                <button
+                                    onClick={() => setRunLimitWarning(false)}
+                                    className="ml-1 text-amber-500/60 hover:text-amber-300 transition-colors"
+                                >
+                                    <X size={11} />
+                                </button>
+                            </div>
+                        )}
                         <div className="flex gap-3">
                             <button onClick={handleRun} disabled={loading} className="flex items-center gap-2 px-6 py-2 bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white text-sm font-semibold rounded-lg transition-all disabled:opacity-50 active:scale-95">
                                 <Play size={14} fill="currentColor" />
@@ -1227,7 +1615,9 @@ const ProblemPage = () => {
                 .dropdown:focus-within .dropdown-content { visibility: visible; opacity: 1; transform: translateY(0); }
                 .whitespace-nowrap::-webkit-scrollbar { display: none; }
                 .whitespace-nowrap { -ms-overflow-style: none; scrollbar-width: none; }
+                @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
             `}</style>
+            
         </div>
     );
 };

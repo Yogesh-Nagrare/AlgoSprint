@@ -27,6 +27,7 @@ import ManageSheets from "./components/ManageSheets";
 import SheetForm from "./pages/SheetForm";
 import Problems from "./pages/Problem";
 import LoadingScreen from "./components/LoadingScreen"; // Import it here
+import SubscriptionPage from './pages/Subscriptionmodal';
 
 function App(){
   
@@ -84,6 +85,7 @@ function App(){
       <Route path="/admin/sheets/manage" element={<ManageSheets />} />
 <Route path="/admin/sheet/create" element={<SheetForm />} />
 <Route path="/admin/sheet/edit/:sheetId" element={<SheetForm />} />
+<Route path="/subscription" element={<SubscriptionPage />} />
     </Routes>
   </>
   )
