@@ -15,6 +15,7 @@
 
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
+import ProblemDescription from '../components/Problemdescription';
 import {
     Play, Send, Code2, FileText, History, Lightbulb,
     MessageSquare, Terminal, CheckCircle2, XCircle,
@@ -115,9 +116,9 @@ const MobileProblemPage = ({
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     const bottomTabs = [
-        { id: 'problem', label: 'Problem', icon: <FileText size={18} /> },
-        { id: 'code',    label: 'Code',    icon: <Code2    size={18} /> },
-        { id: 'console', label: 'Console', icon: <Terminal size={18} /> },
+        { id: 'problem', label: 'Problem', icon: <FileText size={25} /> },
+        { id: 'code',    label: 'Code',    icon: <Code2    size={25} /> },
+        { id: 'console', label: 'Console', icon: <Terminal size={25} /> },
     ];
 
     const leftTabs = [
@@ -214,38 +215,7 @@ const MobileProblemPage = ({
                         {problem && (
                             <>
                                 {activeLeftTab === 'description' && (
-                                    <div className="space-y-4 pb-8">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <h1 className="text-xl font-bold text-white leading-tight">{problem.title}</h1>
-                                            {getStatusBadge && getStatusBadge()}
-                                        </div>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getDifficultyColor(problem.difficulty)}`}>
-                                                {problem.difficulty}
-                                            </span>
-                                            <span className="text-gray-500 text-xs flex items-center gap-1">
-                                                <History size={11}/> 1.2k Submissions
-                                            </span>
-                                        </div>
-                                        <div className="text-gray-300 text-sm leading-relaxed space-y-3">
-                                            {problem.description.split('\n').map((p, i) => <p key={i}>{p}</p>)}
-                                        </div>
-                                        <div className="space-y-6 pt-2">
-                                            {problem.visibleTestCases.map((ex, i) => (
-                                                <div key={i}>
-                                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                        <span className="w-5 h-5 rounded bg-white/5 flex items-center justify-center text-[9px] text-orange-500 border border-white/10">0{i+1}</span>
-                                                        Example {i+1}
-                                                    </h3>
-                                                    <div className="bg-[#141414] border border-white/5 p-4 rounded-xl font-mono text-xs leading-6">
-                                                        <div className="flex gap-3"><span className="text-orange-500/70 w-14 shrink-0">Input:</span><span className="text-gray-200 break-all">{ex.input}</span></div>
-                                                        <div className="flex gap-3"><span className="text-emerald-500/70 w-14 shrink-0">Output:</span><span className="text-gray-200 break-all">{ex.output}</span></div>
-                                                        {ex.explanation && <div className="flex gap-3"><span className="text-emerald-500/70 w-14 shrink-0">Explain:</span><span className="text-gray-200">{ex.explanation}</span></div>}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                                <ProblemDescription problem={problem} getStatusBadge={getStatusBadge} />
                                 )}
 
                                 {activeLeftTab === 'editorial'   && EditorialComponent}
@@ -697,7 +667,7 @@ const MobileProblemPage = ({
 
             {/* ── BOTTOM NAV ── */}
             <nav
-                className="flex bg-[#1a1a1a] border-t border-white/10 shrink-0 z-30"
+                className="flex bg-[#1a1a1a] border-t border-white/10 shrink-0 z-30 h-25"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
                 {bottomTabs.map(tab => (

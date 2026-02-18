@@ -10,6 +10,7 @@ import ChatAi from '../components/ChatAi';
 import Editorial from '../components/Editorial';
 import MobileProblemPage, { useIsMobile } from '../pages/MobileProblemPage';
 import { useNavigate } from 'react-router';
+import ProblemDescription from '../components/Problemdescription';
 import { 
     ChevronDown, 
     Play, 
@@ -620,6 +621,40 @@ if (isMobile) {
                     </NavLink>
                     <span className="text-gray-700">/</span>
                     <span className="font-semibold text-gray-100 tracking-tight">{problem?.title}</span>
+                    
+                </div>
+                <div className="flex items-center gap-2">
+
+                {/* RUN */}
+                <button
+                    onClick={handleRun}
+                    disabled={loading}
+                    className="group flex items-center gap-2 px-5 py-2 rounded-xl bg-[#2a2a2a] hover:bg-[#333] border border-white/[0.09] hover:border-white/[0.17] text-[#bbb] hover:text-white text-[13px] font-semibold transition-all duration-150 disabled:opacity-45 disabled:cursor-not-allowed active:scale-[0.96]"
+                >
+                    <Play
+                    size={12}
+                    fill="#4ade80"
+                    className="group-hover:scale-110 transition-transform duration-150"
+                    />
+                    {loading ? 'Running...' : 'Run'}
+                </button>
+
+                {/* SUBMIT */}
+                <button
+                    onClick={handleInitialSubmitClick}
+                    disabled={loading}
+                    className="group relative flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white text-[13px] font-bold border-none shadow-[0_0_16px_rgba(249,115,22,0.3),inset_0_1px_0_rgba(255,255,255,0.12)] hover:shadow-[0_0_28px_rgba(249,115,22,0.5),inset_0_1px_0_rgba(255,255,255,0.15)] hover:-translate-y-px transition-all duration-150 disabled:opacity-45 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none active:scale-[0.96] overflow-hidden"
+                >
+                    {/* shimmer sweep */}
+                    <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
+
+                    <Send
+                    size={13}
+                    className="group-hover:translate-x-px group-hover:-translate-y-px transition-transform duration-150"
+                    />
+                    {loading ? 'Processing...' : (quota.submitsLeft > 0 ? 'Submit' : 'AI Analysis')}
+                </button>
+
                 </div>
                 
                 <div className="flex items-center gap-4">
@@ -1021,45 +1056,7 @@ if (isMobile) {
                         {problem && (
                             <div className="max-w-3xl mx-auto h-full">
                                 {activeLeftTab === 'description' && (
-                                    <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h1 className="text-3xl font-bold text-white tracking-tight">
-                                                {problem.title}
-                                            </h1>
-                                            <div>{getStatusBadge()}</div>
-                                        </div>
-
-                                        <div className="flex items-center gap-3 mb-8">
-                                            <span className={`px-4 py-1 rounded-full text-xs font-bold border ${getDifficultyColor(problem.difficulty)}`}>
-                                                {problem.difficulty}
-                                            </span>
-                                            <span className="text-gray-500 text-xs flex items-center gap-1">
-                                                <History size={12} /> 1.2k Submissions
-                                            </span>
-                                        </div>
-
-                                        <div className="text-gray-300 leading-relaxed text-[16px] space-y-6 mb-12 font-normal">
-                                            {problem.description.split('\n').map((para, i) => (
-                                                <p key={i}>{para}</p>
-                                            ))}
-                                        </div>
-
-                                        <div className="space-y-10">
-                                            {problem.visibleTestCases.map((example, index) => (
-                                                <div key={index} className="group">
-                                                    <h3 className="text-gray-100 font-bold text-sm uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                        <span className="w-6 h-6 rounded bg-white/5 flex items-center justify-center text-[10px] text-orange-500 border border-white/10">0{index + 1}</span>
-                                                        Example {index + 1}
-                                                    </h3>
-                                                    <div className="bg-[#141414] border border-white/5 p-5 rounded-xl font-mono text-[13px] leading-7 group-hover:border-white/10 transition-colors">
-                                                        <div className="flex gap-4"><span className="text-orange-500/70 w-16 shrink-0">Input:</span> <span className="text-gray-200">{example.input}</span></div>
-                                                        <div className="flex gap-4"><span className="text-emerald-500/70 w-16 shrink-0">Output:</span> <span className="text-gray-200">{example.output}</span></div>
-                                                        <div className="flex gap-4"><span className="text-emerald-500/70 w-16 shrink-0">Expanation:</span> <span className="text-gray-200">{example.explanation}</span></div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                                <ProblemDescription problem={problem} getStatusBadge={getStatusBadge} />
                                 )}
                                 {activeLeftTab === 'editorial' && <Editorial secureUrl={problem.secureUrl} thumbnailUrl={problem.thumbnailUrl} duration={problem.duration}/>}
                                 {activeLeftTab === 'submissions' && <SubmissionHistory problemId={problemId} />}
