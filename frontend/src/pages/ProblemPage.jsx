@@ -823,6 +823,7 @@ if (isMobile) {
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-1.5">
                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                                    
                                     <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest font-sans">AI Mode</span>
                                 </div>
                                 <button onClick={() => setShowAIOverlay(false)} className="p-1 rounded-md hover:bg-white/10 text-gray-500 hover:text-white transition-colors">
@@ -893,6 +894,14 @@ if (isMobile) {
                                     <span className="text-[11px] text-gray-400 tracking-wider font-mono">judge — static-analysis</span>
                                 </div>
                                 <div className="flex items-center gap-3">
+                                    <button     onClick={() => navigate('/subscription')} className="relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500 transition-all duration-300 group/btn">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 group-hover/btn:text-black">
+                                            Get Unlimited Access
+                                        </span>
+                                        <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center group-hover/btn:bg-black/20">
+                                            <ChevronDown size={10} className="-rotate-90 text-amber-500 group-hover/btn:text-black" />
+                                        </div>
+                                    </button>
                                     <div className="flex items-center gap-1.5">
                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
                                         <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest font-sans">AI Mode</span>
@@ -968,9 +977,13 @@ if (isMobile) {
                                         <X size={12} />
                                         Close
                                     </button>
-                                    <button className="flex-1 flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 rounded-lg text-xs font-bold shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all text-white">
-                                        <Rocket size={12} />
-                                        Unlock Real Execution
+                                     <button     onClick={() => navigate('/subscription')} className="relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500 transition-all duration-300 group/btn">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 group-hover/btn:text-black">
+                                            Get Unlimited Access
+                                        </span>
+                                        <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center group-hover/btn:bg-black/20">
+                                            <ChevronDown size={10} className="-rotate-90 text-amber-500 group-hover/btn:text-black" />
+                                        </div>
                                     </button>
                                 </div>
                                 <p className="text-center text-[10px] text-gray-600 font-sans">
