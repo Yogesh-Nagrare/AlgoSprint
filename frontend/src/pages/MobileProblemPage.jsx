@@ -114,7 +114,8 @@ const MobileProblemPage = ({
     const [mobileTab, setMobileTab] = useState('problem');
     const [activeLeftTab, setActiveLeftTab] = useState('description');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
+    // Add this inside MobileProblemPage, near the other useState calls
+    const [isLangOpen, setIsLangOpen] = useState(false);
     const bottomTabs = [
         { id: 'problem', label: 'Problem', icon: <FileText size={25} /> },
         { id: 'code',    label: 'Code',    icon: <Code2    size={25} /> },
@@ -266,24 +267,34 @@ const MobileProblemPage = ({
                 <div className={`absolute inset-0 flex flex-col transition-all duration-300 ${mobileTab === 'code' ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-4'}`}>
                     {/* Code top bar */}
                     <div className="flex items-center justify-between bg-[#252525] border-b border-white/5 px-3 py-2 shrink-0">
-                        <div className="relative group">
-                            <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-white/5 text-gray-300 text-xs font-semibold">
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsLangOpen(v => !v)}
+                                className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-white/5 text-gray-300 text-xs font-semibold"
+                            >
                                 <Code2 size={13} className="text-orange-500"/>
                                 {langMap[selectedLanguage]}
-                                <ChevronDown size={12}/>
+                                <ChevronDown size={12} className={`transition-transform ${isLangOpen ? 'rotate-180' : ''}`}/>
                             </button>
-                            <ul className="absolute left-0 top-full mt-1 z-50 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-2xl overflow-hidden hidden group-hover:block w-36">
-                                {['javascript', 'java', 'cpp'].map(lang => (
-                                    <li key={lang}>
-                                        <button onClick={() => handleLanguageChange(lang)}
-                                            className={`w-full text-left px-3 py-2 text-xs transition-colors ${selectedLanguage === lang ? 'bg-orange-500/10 text-orange-500' : 'hover:bg-white/5 text-gray-400'}`}>
-                                            {langMap[lang]}
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
+                            {isLangOpen && (
+                                <>
+                                    {/* backdrop to close on outside tap */}
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsLangOpen(false)}/>
+                                    <ul className="absolute left-0 top-full mt-1 z-50 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-2xl overflow-hidden w-36">
+                                        {['javascript', 'java', 'cpp'].map(lang => (
+                                            <li key={lang}>
+                                                <button
+                                                    onClick={() => { handleLanguageChange(lang); setIsLangOpen(false); }}
+                                                    className={`w-full text-left px-3 py-2.5 text-xs transition-colors ${selectedLanguage === lang ? 'bg-orange-500/10 text-orange-500' : 'hover:bg-white/5 text-gray-400'}`}
+                                                >
+                                                    {langMap[lang]}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </>
+                            )}
                         </div>
-
                         <div className="flex items-center gap-1">
                             <button onClick={handleResetCode} className="p-1.5 text-gray-500 hover:text-white flex items-center gap-1">
                                 <RotateCcw size={13}/>
@@ -348,7 +359,7 @@ const MobileProblemPage = ({
                             height="100%"
                             key={`mobile-${problemId}-${selectedLanguage}`}
                             language={selectedLanguage === 'cpp' ? 'cpp' : selectedLanguage}
-                            defaultValue={code}
+                            value={code}
                             onChange={handleEditorChange}
                             onMount={handleEditorDidMount}
                             theme={settings.theme}
