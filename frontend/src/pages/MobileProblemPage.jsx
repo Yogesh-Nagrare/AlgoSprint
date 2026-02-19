@@ -603,7 +603,7 @@ const MobileProblemPage = ({
                         <div className="flex-1 overflow-y-auto p-4 scrollbar-hide">
                             {/* Prompt line */}
                             <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                <span className="text-emerald-400 text-xs">judge@AlogoSprint</span>
                                 <span className="text-gray-600 text-xs">:</span>
                                 <span className="text-blue-400 text-xs">~/submissions</span>
                                 <span className="text-gray-600 text-xs">$</span>
@@ -642,7 +642,7 @@ const MobileProblemPage = ({
 
                             {/* Blinking cursor */}
                             <div className="flex items-center gap-1 mt-4">
-                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                <span className="text-emerald-400 text-xs">judge@AlogoSprint</span>
                                 <span className="text-gray-600 text-xs">:</span>
                                 <span className="text-blue-400 text-xs">~/submissions</span>
                                 <span className="text-gray-600 text-xs">$</span>

@@ -869,7 +869,7 @@ if (isMobile) {
 
                         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
                             <div className="flex items-center gap-2 mb-3">
-                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                <span className="text-emerald-400 text-xs">judge@AlogoSprint</span>
                                 <span className="text-gray-600 text-xs">:</span>
                                 <span className="text-blue-400 text-xs">~/submissions</span>
                                 <span className="text-gray-600 text-xs">$</span>
@@ -890,7 +890,7 @@ if (isMobile) {
                                 })}
                             </pre>
                             <div className="flex items-center gap-1 mt-3">
-                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                <span className="text-emerald-400 text-xs">judge@AlogoSprint</span>
                                 <span className="text-gray-600 text-xs">:</span>
                                 <span className="text-blue-400 text-xs">~/submissions</span>
                                 <span className="text-gray-600 text-xs">$</span>
@@ -955,7 +955,7 @@ if (isMobile) {
                             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
                                 {/* Prompt line */}
                                 <div className="flex items-center gap-2 mb-3">
-                                    <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                    <span className="text-emerald-400 text-xs">judge@AlogoSprint</span>
                                     <span className="text-gray-600 text-xs">:</span>
                                     <span className="text-blue-400 text-xs">~/submissions</span>
                                     <span className="text-gray-600 text-xs">$</span>
@@ -994,7 +994,7 @@ if (isMobile) {
 
                                 {/* Blinking cursor */}
                                 <div className="flex items-center gap-1 mt-3">
-                                    <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                    <span className="text-emerald-400 text-xs">judge@AlogoSprint</span>
                                     <span className="text-gray-600 text-xs">:</span>
                                     <span className="text-blue-400 text-xs">~/submissions</span>
                                     <span className="text-gray-600 text-xs">$</span>
@@ -1467,7 +1467,7 @@ if (isMobile) {
                                         <div className="p-4 bg-[#0d0d0d] min-h-[200px]">
                                             {/* Prompt line */}
                                             <div className="flex items-center gap-2 mb-3">
-                                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                                <span className="text-emerald-400 text-xs">judge@AlogoSprint</span>
                                                 <span className="text-gray-600 text-xs">:</span>
                                                 <span className="text-blue-400 text-xs">~/submissions</span>
                                                 <span className="text-gray-600 text-xs">$</span>
@@ -1516,7 +1516,7 @@ if (isMobile) {
 
                                             {/* Blinking cursor */}
                                             <div className="flex items-center gap-1 mt-3">
-                                                <span className="text-emerald-400 text-xs">judge@leetclone</span>
+                                                <span className="text-emerald-400 text-xs">judge@AlogoSprint</span>
                                                 <span className="text-gray-600 text-xs">:</span>
                                                 <span className="text-blue-400 text-xs">~/submissions</span>
                                                 <span className="text-gray-600 text-xs">$</span>

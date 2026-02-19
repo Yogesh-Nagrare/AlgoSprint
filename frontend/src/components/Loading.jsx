@@ -22,7 +22,7 @@ const Loading = () => {
             {/* Loading Text */}
             <div className="flex flex-col items-center gap-3">
                 <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-[0.3em] font-mono text-center">
-                    LeetCode Clone
+                    AlgoSprint
                 </h3>
                 
                 {/* Bouncing Dots */}
