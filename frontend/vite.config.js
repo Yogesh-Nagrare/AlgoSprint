@@ -9,17 +9,4 @@ export default defineConfig({
         react(),
         tailwindcss()
       ],
-
-  build: {
-        chunkSizeWarningLimit: 1000,
-        rollupOptions: {
-            output: {
-                manualChunks: {
-                    monaco: ['@monaco-editor/react', 'monaco-editor'],
-                    vendor: ['react', 'react-dom', 'react-router'],
-                    redux: ['@reduxjs/toolkit', 'react-redux'],
-                }
-            }
-        }
-    }
 })
