@@ -4,6 +4,7 @@ const submitRouter = express.Router();
 const rateLimiter = require('../middleware/rateLimiter');
 const { submitCode, runCode, checkQuota } = require('../controllers/userSubmission');
 const { getAICodeReview } = require('../controllers/aiReview'); // ✨ ADD THIS
+const { syntaxCheck } = require('../controllers/syntaxCheck');
 
 // Rate limiters
 const runLimit = rateLimiter({
@@ -20,6 +21,7 @@ const submitLimit = rateLimiter({
 submitRouter.post("/submit/:id", userMiddleware, submitLimit, submitCode);
 submitRouter.post("/run/:id", userMiddleware, runLimit, runCode);
 submitRouter.get("/quota/:id", userMiddleware, checkQuota);
+submitRouter.post('/syntax-check', userMiddleware, syntaxCheck);
 
 // ✨ AI REVIEW ROUTE (NEW)
 submitRouter.post("/ai-review/:id", userMiddleware, getAICodeReview);

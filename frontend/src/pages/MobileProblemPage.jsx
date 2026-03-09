@@ -109,6 +109,8 @@ const MobileProblemPage = ({
     ChatAiComponent,
     EditorialComponent,
     SubmissionResultOverlayComponent,
+    syntaxErrors = [],
+    isSyntaxChecking = false,
 }) => {
     // Mobile uses a bottom-nav model: "problem" | "code" | "console"
     const [mobileTab, setMobileTab] = useState('problem');
@@ -393,6 +395,27 @@ const MobileProblemPage = ({
                                 >
                                     <X size={12} />
                                 </button>
+                            </div>
+                        )}
+
+                        {isSyntaxChecking && (
+                            <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg mx-4 mt-3">
+                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                                <span className="text-xs text-amber-300 font-mono">Checking syntax…</span>
+                            </div>
+                        )}
+
+                        {!isSyntaxChecking && syntaxErrors?.some(e => e.type === 'error') && (
+                            <div className="mx-4 mt-3 space-y-2">
+                                <p className="text-xs font-bold text-amber-400 font-mono">
+                                    ⚠ Syntax error — fix before running
+                                </p>
+                                {syntaxErrors.filter(e => e.type === 'error').map((e, i) => (
+                                    <div key={i} className="flex gap-2 p-2 rounded-lg bg-red-500/10 border-l-2 border-red-500 text-xs font-mono">
+                                        <span className="text-red-400 font-bold shrink-0">L{e.line}</span>
+                                        <span className="text-gray-300">{e.message}</span>
+                                    </div>
+                                ))}
                             </div>
                         )}
 

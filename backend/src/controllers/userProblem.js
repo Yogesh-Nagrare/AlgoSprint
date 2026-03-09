@@ -9,9 +9,8 @@ const solutionVideo = require('../models/solutionVideo');
 const { wrapCode } = require("../utils/CodeWrapper");
 
 // ... (Keep all your existing functions: createProblem, updateProblem, deleteProblem, etc.)
-
 const createProblem = async (req, res) => {
-    const { 
+    const {
         title, 
         description, 
         difficulty, 
