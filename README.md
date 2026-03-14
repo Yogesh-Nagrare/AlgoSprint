@@ -19,9 +19,9 @@
 
 ## 📸 Screenshots
 
-| Problem Page | Mobile View | AI Review |
+| Dashboard Page | Code-Editor | AI Review |
 |---|---|---|
-| ![Dashboard1](./screenshots/dashboard1.png) | ![Dashboard2](./screenshots/dashboard2.png) | ![codeditor1](./screenshots/codeeditor1.png) | ![codeditor2](./screenshots/codeeditor2.png) | ![AI](./screenshots/aihelp.png) |
+| ![Dashboard1](./screenshots/dashboard1.png) | ![Dashboard2](./screenshots/dashboard2.png) | ![codeditor1](./screenshots//codeeditor1.png) | ![codeditor2](./screenshots/codeeditor2.png) | ![AI](./screenshots/aihelp.png) |
 
 ---
 
