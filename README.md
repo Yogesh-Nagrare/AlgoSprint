@@ -19,10 +19,9 @@
 
 ## 📸 Screenshots
 
-| Dashboard Page1 | Dashboard Page2 | Code-Editor1 | Code-Editor2 | AI Review |
-|---|---|---|
-| ![Dashboard1](./screenshots/dashboard1.png) | ![Dashboard2](./screenshots/dashboard2.png) | ![codeditor1](./screenshots//codeeditor1.png) | ![codeditor2](./screenshots/codeeditor2.png) | ![AI](./screenshots/aihelp.png) |
-
+| Dashboard 1 | Dashboard 2 | Editor 1 | Editor 2 | AI Help |
+|---|---|---|---|---|
+| ![Dashboard1](./screenshots/dashboard1.png) | ![Dashboard2](./screenshots/dashboard2.png) | ![Editor1](./screenshots/codeeditor1.png) | ![Editor2](./screenshots/codeeditor2.png) | ![AI](./screenshots/aihelp.png) |
 ---
 
 ## ✨ Features
