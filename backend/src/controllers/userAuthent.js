@@ -482,25 +482,20 @@ const resetPassword = async (req, res) => {
 };
 
 // logOut feature
-const logout = async(req,res)=>{
-
-    try{
-        const {token} = req.cookies;
-        const payload = jwt.decode(token);
-
-        await redisClient.set(`token:${token}`,'Blocked');
-        await redisClient.expireAt(`token:${token}`,payload.exp);
-    //    Token add kar dung Redis ke blockList
-    //    Cookies ko clear kar dena.....
-
-    res.cookie("token",null,{expires: new Date(Date.now())});
+const logout = async (req, res) => {
+  try {
+    const { token } = req.cookies;
+    if (token) {
+      const payload = jwt.decode(token);
+      await redisClient.set(`token:${token}`, 'Blocked');
+      if (payload?.exp) await redisClient.expireAt(`token:${token}`, payload.exp);
+    }
+    res.clearCookie('token', { httpOnly: true, secure: true, sameSite: 'none' });
     res.send("Logged Out Succesfully");
-
-    }
-    catch(err){
-       res.status(503).send("Error: "+err);
-    }
-}
+  } catch (err) {
+    res.status(503).send("Error: " + err);
+  }
+};
 
 
 const adminRegister = async(req,res)=>{

@@ -5,7 +5,7 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 
 const main = require('./config/db');
-const redisClient = require('./config/redis');
+// const redisClient = require('./config/redis');
 
 const authRouter = require('./routes/userAuth');
 const problemRouter = require('./routes/problemCreator');
