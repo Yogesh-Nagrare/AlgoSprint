@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const app = express();
 const cookieParser = require('cookie-parser');
@@ -74,23 +74,10 @@ let isConnected = false;
 
 const InitializeConnection = async () => {
   if (isConnected) return;
-
   try {
     await main();
     console.log("✅ DB CONNECTED");
-
-    // ✅ Redis should NOT block server startup
-    if (redisClient && !redisClient.isOpen) {
-      try {
-        await redisClient.connect();
-        console.log("✅ Redis CONNECTED");
-      } catch (redisErr) {
-        console.log("⚠️ Redis connection skipped:", redisErr.message);
-      }
-    }
-
     isConnected = true;
-
   } catch (err) {
     console.log("❌ DB Error:", err.message);
   }
